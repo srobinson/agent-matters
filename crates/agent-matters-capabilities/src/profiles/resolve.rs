@@ -3,7 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use agent_matters_core::catalog::{CapabilityIndexRecord, MANIFEST_FILE_NAME, ProfileIndexRecord};
+use agent_matters_core::catalog::{
+    CapabilityIndexRecord, CatalogIndex, MANIFEST_FILE_NAME, ProfileIndexRecord,
+};
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use serde::Serialize;
 
@@ -55,28 +57,54 @@ pub fn resolve_profile(
         repo_root: repo_root.clone(),
         user_state_dir: user_state_dir.clone(),
     })?;
-    let record = loaded.index.profile(&request.profile).cloned();
-    let mut result = ResolveProfileResult {
-        profile: request.profile,
-        record,
-        effective_capabilities: Vec::new(),
-        instruction_fragments: Vec::new(),
-        runtime_configs: Vec::new(),
-        selected_runtime: None,
-        diagnostics: loaded.diagnostics,
-    };
-
-    let Some(profile) = result.record.as_ref() else {
+    let Some(record) = loaded.index.profile(&request.profile).cloned() else {
+        let mut result = ResolveProfileResult {
+            profile: request.profile,
+            record: None,
+            effective_capabilities: Vec::new(),
+            instruction_fragments: Vec::new(),
+            runtime_configs: Vec::new(),
+            selected_runtime: None,
+            diagnostics: loaded.diagnostics,
+        };
         result.diagnostics.push(profile_not_found(&result.profile));
         return Ok(result);
     };
 
-    let profile_manifest_path = PathBuf::from(&profile.source_path).join(MANIFEST_FILE_NAME);
+    let profile_manifest_path = PathBuf::from(&record.source_path).join(MANIFEST_FILE_NAME);
+    Ok(resolve_profile_record(
+        &repo_root,
+        &user_state_dir,
+        &loaded.index,
+        record,
+        profile_manifest_path,
+        loaded.diagnostics,
+    ))
+}
+
+pub(crate) fn resolve_profile_record(
+    repo_root: &Path,
+    user_state_dir: &Path,
+    index: &CatalogIndex,
+    profile: ProfileIndexRecord,
+    profile_manifest_path: PathBuf,
+    diagnostics: Vec<Diagnostic>,
+) -> ResolveProfileResult {
+    let mut result = ResolveProfileResult {
+        profile: profile.id.clone(),
+        record: Some(profile),
+        effective_capabilities: Vec::new(),
+        instruction_fragments: Vec::new(),
+        runtime_configs: Vec::new(),
+        selected_runtime: None,
+        diagnostics,
+    };
+    let profile = result.record.as_ref().expect("profile record is present");
     let resolution = resolve_profile_ids(profile, &profile_manifest_path, &mut result.diagnostics);
     let mut missing_references = BTreeSet::new();
 
     for reference in resolution.effective_capabilities {
-        match loaded.index.capability(&reference.id) {
+        match index.capability(&reference.id) {
             Some(record) => result.effective_capabilities.push(record.clone()),
             None if missing_references.insert(reference.id.clone()) => {
                 result
@@ -88,7 +116,7 @@ pub fn resolve_profile(
     }
 
     for reference in resolution.instruction_fragments {
-        match loaded.index.capability(&reference.id) {
+        match index.capability(&reference.id) {
             Some(record) => {
                 result
                     .instruction_fragments
@@ -104,8 +132,8 @@ pub fn resolve_profile(
     }
 
     let runtime_resolution = resolve_runtime_configs(
-        &repo_root,
-        &user_state_dir,
+        repo_root,
+        user_state_dir,
         profile,
         &result.effective_capabilities,
         &profile_manifest_path,
@@ -114,7 +142,7 @@ pub fn resolve_profile(
     result.selected_runtime = runtime_resolution.selected_runtime;
     result.diagnostics.extend(runtime_resolution.diagnostics);
 
-    Ok(result)
+    result
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

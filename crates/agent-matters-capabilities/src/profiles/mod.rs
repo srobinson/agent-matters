@@ -27,6 +27,7 @@ pub use build_plan::{
     BuildPlanContentInput, BuildPlanPaths, BuildProfilePlanRequest, BuildProfilePlanResult,
     ProfileBuildPlan, plan_profile_build,
 };
+pub(crate) use build_plan::{ResolvedProfileBuildPlanRequest, plan_resolved_profile_build};
 pub use build_writer::{
     ProfileBuildWriteStatus, WriteProfileBuildRequest, WriteProfileBuildResult,
     WrittenProfileBuild, write_profile_build,
@@ -43,6 +44,7 @@ pub use requirements::{
     CapabilityRequirementCheck, EnvRequirementCheck, ProfileRequirementValidationMode,
     ProfileRequirementValidationResult, RequirementPresence, validate_profile_requirements,
 };
+pub(crate) use resolve::resolve_profile_record;
 pub use resolve::{
     ResolveProfileRequest, ResolveProfileResult, ResolvedInstructionFragment, resolve_profile,
 };

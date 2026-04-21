@@ -28,6 +28,12 @@ pub const PROFILES_SHOW_AFTER_HELP: &str =
   agent-matters profiles show my-profile --json";
 
 #[rustfmt::skip]
+pub const PROFILES_RESOLVE_AFTER_HELP: &str =
+"Examples:\n  \
+  agent-matters profiles resolve 'debug Playwright browser automation' --runtime codex\n  \
+  agent-matters profiles resolve 'linear triage' ./some/repo --runtime claude --json";
+
+#[rustfmt::skip]
 pub const PROFILES_COMPILE_AFTER_HELP: &str =
 "Examples:\n  \
   agent-matters profiles compile my-profile --runtime codex\n  \

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use agent_matters_capabilities::jit::JitProfileResolveResult;
 use agent_matters_capabilities::profiles::{
     CompileProfileBuildResult, ProfileBuildWriteStatus, ShowProfileResult, UseProfileResult,
 };
@@ -37,6 +38,45 @@ pub(crate) fn render_profile_show(result: &ShowProfileResult) {
     render_runtime_configs(result);
     render_capabilities(result);
     render_instruction_fragments(result);
+}
+
+pub(crate) fn render_profile_resolve(result: &JitProfileResolveResult) {
+    println!("Runtime: {}", result.runtime);
+    match &result.selected {
+        Some(selected) => {
+            println!(
+                "Selection: {}\t{}\t{}",
+                selected.kind, selected.id, selected.reason
+            );
+        }
+        None => println!("Selection: none"),
+    }
+
+    if let Some(cache) = &result.session_cache {
+        println!("Session cache: {}", cache.cache_dir.display());
+        println!(
+            "Profile manifest: {}",
+            cache.profile_manifest_path.display()
+        );
+    }
+    if let Some(plan) = &result.build_plan {
+        println!("Build plan profile: {}", plan.profile);
+        println!("Build plan runtime: {}", plan.runtime);
+        println!("Build fingerprint: {}", plan.fingerprint);
+    }
+
+    println!();
+    println!("Candidates:");
+    if result.candidates.is_empty() {
+        println!("none");
+    } else {
+        for candidate in &result.candidates {
+            println!(
+                "{}\t{}\t{}\t{}",
+                candidate.kind, candidate.id, candidate.score, candidate.reason
+            );
+        }
+    }
 }
 
 pub(crate) fn render_profile_compile(result: &CompileProfileBuildResult) {

@@ -16,6 +16,17 @@ pub const PROFILES_SHOW_PROFILE_HELP: &str = "Profile identifier (matches the `i
 pub const PROFILES_SHOW_JSON_HELP: &str = "Emit machine readable JSON instead of the human rendering";
 
 #[rustfmt::skip]
+pub const PROFILES_RESOLVE_ABOUT: &str = "Resolve a task into an existing profile or local JIT profile.\n\nUses only local catalog profiles and capabilities. When a clear capability composition is found, writes a generated profile manifest under the session cache so the result can feed compile without mutating authored catalog files.";
+#[rustfmt::skip]
+pub const PROFILES_RESOLVE_TASK_HELP: &str = "Task text to resolve into local profile material";
+#[rustfmt::skip]
+pub const PROFILES_RESOLVE_PATH_HELP: &str = "Workspace path for task context. Defaults to the current working directory.";
+#[rustfmt::skip]
+pub const PROFILES_RESOLVE_RUNTIME_HELP: &str = "Target runtime for candidate filtering and build planning";
+#[rustfmt::skip]
+pub const PROFILES_RESOLVE_JSON_HELP: &str = "Emit machine readable JSON instead of the human resolver summary";
+
+#[rustfmt::skip]
 pub const PROFILES_COMPILE_ABOUT: &str = "Compile a runtime home for the given profile without activating it.\n\nWrites an immutable build under the managed builds directory, fingerprinted by resolved content. No existing `.codex` or `.claude` directory is touched. Use `profiles use` to point a runtime at the compiled build.";
 #[rustfmt::skip]
 pub const PROFILES_COMPILE_PROFILE_HELP: &str = "Profile identifier to compile";

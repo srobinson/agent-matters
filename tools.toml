@@ -59,6 +59,40 @@ type = "boolean"
 cli_flag = "json"
 cli_help = "Emit machine readable JSON instead of the human rendering"
 
+[tools.profiles-resolve]
+cli_about = """
+Resolve a task into an existing profile or local JIT profile.
+
+Uses only local catalog profiles and capabilities. When a clear capability \
+composition is found, writes a generated profile manifest under the session \
+cache so the result can feed compile without mutating authored catalog files.
+"""
+
+[[tools.profiles-resolve.params]]
+name = "task"
+type = "string"
+required = true
+cli_help = "Task text to resolve into local profile material"
+
+[[tools.profiles-resolve.params]]
+name = "path"
+type = "string"
+cli_help = "Workspace path for task context. Defaults to the current working directory."
+
+[[tools.profiles-resolve.params]]
+name = "runtime"
+type = "string"
+required = true
+enum = ["codex", "claude"]
+cli_flag = "runtime"
+cli_help = "Target runtime for candidate filtering and build planning"
+
+[[tools.profiles-resolve.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human resolver summary"
+
 [tools.profiles-compile]
 cli_about = """
 Compile a runtime home for the given profile without activating it.

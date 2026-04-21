@@ -19,9 +19,9 @@ use serde::Serialize;
 use crate::catalog::CatalogIndexError;
 
 use super::{
-    BuildPlanInstructionOutput, ResolveProfileRequest, ResolvedInstructionFragment,
-    ResolvedRuntimeConfig, adapter_for_runtime, resolve_instruction_output, resolve_profile,
-    unknown_runtime_adapter,
+    BuildPlanInstructionOutput, ResolveProfileRequest, ResolveProfileResult,
+    ResolvedInstructionFragment, ResolvedRuntimeConfig, adapter_for_runtime,
+    resolve_instruction_output, resolve_profile, unknown_runtime_adapter,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +30,14 @@ pub struct BuildProfilePlanRequest {
     pub user_state_dir: PathBuf,
     pub profile: String,
     pub runtime: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedProfileBuildPlanRequest {
+    pub repo_root: PathBuf,
+    pub user_state_dir: PathBuf,
+    pub runtime: Option<String>,
+    pub resolved: ResolveProfileResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -87,75 +95,103 @@ pub fn plan_profile_build(
         user_state_dir: request.user_state_dir.clone(),
         profile: request.profile.clone(),
     })?;
-    let mut diagnostics = resolved.diagnostics;
-    if request.runtime.is_some() {
+    Ok(plan_resolved_profile_build(
+        ResolvedProfileBuildPlanRequest {
+            repo_root: request.repo_root,
+            user_state_dir: request.user_state_dir,
+            runtime: request.runtime,
+            resolved,
+        },
+    ))
+}
+
+pub(crate) fn plan_resolved_profile_build(
+    request: ResolvedProfileBuildPlanRequest,
+) -> BuildProfilePlanResult {
+    let ResolvedProfileBuildPlanRequest {
+        repo_root,
+        user_state_dir,
+        runtime,
+        resolved,
+    } = request;
+    let ResolveProfileResult {
+        profile,
+        record,
+        effective_capabilities,
+        instruction_fragments,
+        runtime_configs,
+        selected_runtime,
+        diagnostics,
+    } = resolved;
+    let mut diagnostics = diagnostics;
+    if runtime.is_some() {
         remove_default_runtime_diagnostics(&mut diagnostics);
     }
     let mut result = BuildProfilePlanResult {
-        profile: request.profile,
+        profile,
         plan: None,
         diagnostics: Vec::new(),
     };
 
-    let Some(profile_record) = resolved.record else {
+    let Some(profile_record) = record else {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     };
 
     let runtime_config = select_runtime_config(
-        request.runtime.as_deref(),
-        resolved.selected_runtime.as_deref(),
-        &resolved.runtime_configs,
+        runtime.as_deref(),
+        selected_runtime.as_deref(),
+        &runtime_configs,
         &profile_record,
         &mut diagnostics,
     );
     if has_error_diagnostics(&diagnostics) {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     }
     let Some(runtime_config) = runtime_config else {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     };
     let Some(adapter) = adapter_for_runtime(&runtime_config.id) else {
         diagnostics.push(unknown_runtime_adapter(&runtime_config.id));
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     };
     diagnostics.extend(adapter.validate_config(&runtime_config));
     if has_error_diagnostics(&diagnostics) {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     }
 
     let instruction_output = resolve_instruction_output(
-        &request.repo_root,
-        &request.user_state_dir,
+        &repo_root,
+        &user_state_dir,
         &profile_record,
         &mut diagnostics,
     );
     if has_error_diagnostics(&diagnostics) {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     }
 
     let candidates = content_input_candidates(
-        &request.repo_root,
-        &request.user_state_dir,
+        &repo_root,
+        &user_state_dir,
         &profile_record,
-        &resolved.effective_capabilities,
+        &effective_capabilities,
     );
     let read_inputs = read_content_inputs(candidates, &mut diagnostics);
     if has_error_diagnostics(&diagnostics) {
         result.diagnostics = diagnostics;
-        return Ok(result);
+        return result;
     }
 
     let adapter_version = adapter.version().to_string();
     let fingerprint = build_fingerprint(
         &profile_record,
-        &resolved.effective_capabilities,
-        &resolved.instruction_fragments,
+        &effective_capabilities,
+        &instruction_fragments,
         &instruction_output,
         &runtime_config,
         &adapter_version,
@@ -179,8 +215,8 @@ pub fn plan_profile_build(
         build_id,
         paths,
         profile_record,
-        effective_capabilities: resolved.effective_capabilities,
-        instruction_fragments: resolved.instruction_fragments,
+        effective_capabilities,
+        instruction_fragments,
         instruction_output,
         runtime_config,
         content_inputs: read_inputs
@@ -189,7 +225,7 @@ pub fn plan_profile_build(
             .collect(),
     });
     result.diagnostics = diagnostics;
-    Ok(result)
+    result
 }
 
 fn select_runtime_config(

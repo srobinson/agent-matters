@@ -30,6 +30,7 @@ fn profiles_help_lists_all_verbs() {
         .success()
         .stdout(contains("list"))
         .stdout(contains("show"))
+        .stdout(contains("resolve"))
         .stdout(contains("compile"))
         .stdout(contains("use"));
 }
@@ -124,6 +125,18 @@ fn profiles_compile_accepts_runtime_value() {
 }
 
 #[test]
+fn profiles_resolve_accepts_runtime_and_json_flags() {
+    bin()
+        .args(["profiles", "resolve", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("--runtime"))
+        .stdout(contains("--json"))
+        .stdout(contains("session cache"))
+        .stdout(contains("agent-matters profiles resolve"));
+}
+
+#[test]
 fn profiles_use_advertises_runtime_and_json_flags() {
     bin()
         .args(["profiles", "use", "--help"])
@@ -133,6 +146,28 @@ fn profiles_use_advertises_runtime_and_json_flags() {
         .stdout(contains("--json"))
         .stdout(contains("Defaults through profile"))
         .stdout(contains("agent-matters profiles use my-profile"));
+}
+
+#[test]
+fn profiles_resolve_json_returns_session_cache_profile() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args([
+            "profiles",
+            "resolve",
+            "linear",
+            "--runtime",
+            "codex",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"jit-profile\""))
+        .stdout(contains("\"profile_manifest_path\""))
+        .stdout(contains("\"mcp:linear\""));
 }
 
 #[test]
