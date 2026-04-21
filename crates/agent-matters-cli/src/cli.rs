@@ -154,6 +154,9 @@ pub(crate) fn emit_diagnostics(diagnostics: &[agent_matters_core::domain::Diagno
             diagnostic.code,
             diagnostic.message
         );
+        if let Some(hint) = &diagnostic.recovery_hint {
+            eprintln!("  hint: {hint}");
+        }
     }
 }
 

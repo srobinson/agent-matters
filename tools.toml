@@ -118,9 +118,9 @@ cli_help = "Target runtime for activation"
 cli_about = """
 List capabilities discovered in the local catalog.
 
-Each row includes the capability id, its kind (skill, mcp, hook, \
-instruction, agent, runtime-setting), its source of record, and any overlay \
-state (pristine vendor copy, diverged, or locally authored).
+Each row includes the capability id, kind, runtime support, provenance state, \
+and summary. Use `capabilities show` to inspect files, requirements, source \
+paths, and overlay metadata.
 """
 
 [[tools.capabilities-list.params]]
@@ -133,9 +133,9 @@ cli_help = "Emit machine readable JSON instead of the human table"
 cli_about = """
 Show a single capability and its metadata.
 
-Prints the manifest, provenance (source, vendor record hash if present), \
-declared requirements, included files, and which profiles currently \
-reference the capability.
+Prints the manifest details, source path, included files, runtime \
+compatibility, requirements, provenance, and overlay metadata for one exact \
+capability id.
 """
 
 [[tools.capabilities-show.params]]

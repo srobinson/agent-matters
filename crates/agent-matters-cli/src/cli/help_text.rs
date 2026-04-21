@@ -48,14 +48,14 @@ pub const CAPABILITIES_LIST_AFTER_HELP: &str =
 #[rustfmt::skip]
 pub const CAPABILITIES_SHOW_AFTER_HELP: &str =
 "Examples:\n  \
-  agent-matters capabilities show helioy/mail\n  \
-  agent-matters capabilities show helioy/mail --json";
+  agent-matters capabilities show skill:playwright\n  \
+  agent-matters capabilities show skill:playwright --json";
 
 #[rustfmt::skip]
 pub const CAPABILITIES_DIFF_AFTER_HELP: &str =
 "Examples:\n  \
-  agent-matters capabilities diff helioy/mail\n  \
-  agent-matters capabilities diff helioy/mail --json";
+  agent-matters capabilities diff skill:playwright\n  \
+  agent-matters capabilities diff skill:playwright --json";
 
 #[rustfmt::skip]
 pub const SOURCES_SEARCH_AFTER_HELP: &str =

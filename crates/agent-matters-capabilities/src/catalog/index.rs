@@ -215,6 +215,7 @@ fn capability_record(
         id: manifest.id.to_string(),
         kind: manifest.kind.as_str().to_string(),
         summary: manifest.summary.clone(),
+        files: manifest.files.entries.clone(),
         source_path: relative_path(repo_root, &entry.directory_path),
         source: capability_source_summary(repo_root, entry),
         runtimes: manifest

@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 2;
+pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 3;
 pub const INDEXES_DIR_NAME: &str = "indexes";
 pub const CATALOG_INDEX_FILE_NAME: &str = "catalog.json";
 
@@ -47,6 +47,8 @@ pub struct CapabilityIndexRecord {
     pub id: String,
     pub kind: String,
     pub summary: String,
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
     pub source_path: String,
     pub source: CapabilitySourceSummary,
     pub runtimes: BTreeMap<String, RuntimeCompatibilitySummary>,
@@ -114,6 +116,7 @@ mod tests {
             id: "skill:playwright".to_string(),
             kind: "skill".to_string(),
             summary: "Browser automation".to_string(),
+            files: BTreeMap::from([("source".to_string(), "SKILL.md".to_string())]),
             source_path: "catalog/skills/playwright".to_string(),
             source: CapabilitySourceSummary {
                 kind: "local".to_string(),
