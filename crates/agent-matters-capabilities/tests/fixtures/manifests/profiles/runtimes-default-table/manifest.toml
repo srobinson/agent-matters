@@ -1,0 +1,10 @@
+id = "runtimes-default-table"
+kind = "task"
+summary = "Profile using the rejected runtimes.default subtable shape."
+capabilities = ["mcp:linear"]
+instructions = ["instruction:helioy-core"]
+
+[runtimes.default]
+
+[runtimes.codex]
+enabled = true

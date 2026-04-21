@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::id::{IdError, validate_id_body};
 
 /// Identifier for a runtime adapter, for example `codex` or `claude`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuntimeId(String);
 
 impl RuntimeId {
