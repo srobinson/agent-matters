@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use agent_matters_core::catalog::CapabilityIndexRecord;
-use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
+use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use serde::Serialize;
 
 use crate::catalog::{CatalogIndexError, LoadCatalogIndexRequest, load_or_refresh_catalog_index};
@@ -58,5 +58,6 @@ fn not_found(capability: &str) -> Diagnostic {
         "capability.show-not-found",
         format!("capability `{capability}` was not found in the catalog index"),
     )
+    .with_location(DiagnosticLocation::field("capability"))
     .with_recovery_hint("run `agent-matters capabilities list` to inspect exact capability ids")
 }

@@ -104,6 +104,13 @@ fn missing_capability_returns_actionable_error() {
     assert!(result.has_error_diagnostics());
     assert!(has_code(&result.diagnostics, "capability.show-not-found"));
     assert_eq!(
+        result.diagnostics[0]
+            .location
+            .as_ref()
+            .and_then(|location| location.field.as_deref()),
+        Some("capability")
+    );
+    assert_eq!(
         result.diagnostics[0].recovery_hint.as_deref(),
         Some("run `agent-matters capabilities list` to inspect exact capability ids")
     );
