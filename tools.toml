@@ -118,8 +118,8 @@ cli_help = "Target runtime for activation"
 cli_about = """
 List capabilities discovered in the local catalog.
 
-Each row includes the capability id, its kind (instruction, hook, mcp, \
-runtime-setting, launch-material), its source of record, and any overlay \
+Each row includes the capability id, its kind (skill, mcp, hook, \
+instruction, agent, runtime-setting), its source of record, and any overlay \
 state (pristine vendor copy, diverged, or locally authored).
 """
 

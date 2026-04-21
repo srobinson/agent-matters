@@ -32,7 +32,7 @@ pub const PROFILES_USE_PATH_HELP: &str = "Directory to activate the profile in. 
 pub const PROFILES_USE_RUNTIME_HELP: &str = "Target runtime for activation";
 
 #[rustfmt::skip]
-pub const CAPABILITIES_LIST_ABOUT: &str = "List capabilities discovered in the local catalog.\n\nEach row includes the capability id, its kind (instruction, hook, mcp, runtime-setting, launch-material), its source of record, and any overlay state (pristine vendor copy, diverged, or locally authored).";
+pub const CAPABILITIES_LIST_ABOUT: &str = "List capabilities discovered in the local catalog.\n\nEach row includes the capability id, its kind (skill, mcp, hook, instruction, agent, runtime-setting), its source of record, and any overlay state (pristine vendor copy, diverged, or locally authored).";
 #[rustfmt::skip]
 pub const CAPABILITIES_LIST_JSON_HELP: &str = "Emit machine readable JSON instead of the human table";
 
