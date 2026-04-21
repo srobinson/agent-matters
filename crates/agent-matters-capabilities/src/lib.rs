@@ -14,6 +14,7 @@
 pub mod capabilities;
 pub mod catalog;
 pub mod config;
+pub mod doctor;
 pub mod jit;
 pub mod profiles;
 pub mod sources;
