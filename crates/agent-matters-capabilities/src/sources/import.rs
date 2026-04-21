@@ -166,6 +166,11 @@ pub fn import_source_from_adapter_with_policy<A: SourceAdapter>(
     request: ImportSourceAdapterRequest<'_, A>,
     policy: &SourceTrustPolicy,
 ) -> Result<ImportSourceResult, ImportSourceError> {
+    let source_id = request.adapter.source_id().to_string();
+    if !policy.allows_source(&source_id) {
+        return Err(trust_blocked(source_id, None));
+    }
+
     let imported = request.adapter.import_capability(SourceImportRequest {
         locator: request.locator,
     })?;

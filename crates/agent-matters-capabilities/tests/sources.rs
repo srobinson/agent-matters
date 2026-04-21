@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -68,6 +69,43 @@ impl SourceAdapter for FakeSourceAdapter {
                 })
                 .to_string(),
             }],
+            diagnostics: Vec::new(),
+        })
+    }
+}
+
+struct BlockedSourceAdapter {
+    import_called: Cell<bool>,
+}
+
+impl SourceAdapter for BlockedSourceAdapter {
+    fn source_id(&self) -> &str {
+        "blocked-source"
+    }
+
+    fn search(
+        &self,
+        request: SourceSearchRequest,
+    ) -> Result<SourceSearchResult, SourceAdapterError> {
+        Ok(SourceSearchResult {
+            source: self.source_id().to_string(),
+            query: request.query,
+            entries: Vec::new(),
+            diagnostics: Vec::new(),
+        })
+    }
+
+    fn import_capability(
+        &self,
+        request: SourceImportRequest,
+    ) -> Result<SourceImportResult, SourceAdapterError> {
+        self.import_called.set(true);
+        Ok(SourceImportResult {
+            source: self.source_id().to_string(),
+            locator: request.locator,
+            manifest: fake_manifest("playwright"),
+            catalog_files: Vec::new(),
+            vendor_files: Vec::new(),
             diagnostics: Vec::new(),
         })
     }
@@ -221,6 +259,35 @@ fn source_trust_policy_blocks_unknown_source_import() {
     assert!(diagnostic.message.contains("unknown"));
     assert!(diagnostic.message.contains("capability kind `unknown`"));
     assert!(!repo.path().join("catalog").exists());
+}
+
+#[test]
+fn source_trust_policy_blocks_adapter_source_before_invocation() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    let adapter = BlockedSourceAdapter {
+        import_called: Cell::new(false),
+    };
+
+    let err = import_source_from_adapter_with_policy(
+        ImportSourceAdapterRequest {
+            repo_root: repo.path().to_path_buf(),
+            user_state_dir: state.path().to_path_buf(),
+            locator: "playwright".to_string(),
+            replace_existing: false,
+            adapter: &adapter,
+        },
+        &SourceTrustPolicy::conservative_default(),
+    )
+    .unwrap_err();
+
+    let diagnostic = err.to_diagnostic();
+    assert_eq!(diagnostic.code, "source.trust-blocked");
+    assert!(diagnostic.message.contains("blocked-source"));
+    assert!(diagnostic.message.contains("capability kind `unknown`"));
+    assert!(!adapter.import_called.get());
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
 }
 
 #[test]
