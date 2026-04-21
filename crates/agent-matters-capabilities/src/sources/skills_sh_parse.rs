@@ -1,5 +1,6 @@
 //! Parsing helpers for the `skills.sh` command line output.
 
+use agent_matters_core::domain::validate_id_body;
 use serde_json::json;
 
 use super::{SourceAdapterError, SourceSearchEntry};
@@ -130,16 +131,30 @@ pub(super) fn strip_ansi(input: &str) -> String {
 
 fn locator_from_parts(owner: &str, repo: &str, skill: &str) -> Result<SkillsShLocator, String> {
     for (label, value) in [("owner", owner), ("repository", repo), ("skill", skill)] {
-        if value.is_empty() || value.chars().any(|ch| ch.is_whitespace() || ch == '/') {
-            return Err(format!("locator {label} `{value}` is invalid"));
-        }
+        validate_locator_component(label, value)?;
     }
+    validate_id_body(skill).map_err(|source| {
+        format!("locator skill `{skill}` cannot become a capability id: {source}")
+    })?;
 
     Ok(SkillsShLocator {
         package: format!("{owner}/{repo}"),
         skill: skill.to_string(),
         display: format!("{owner}/{repo}@{skill}"),
     })
+}
+
+fn validate_locator_component(label: &str, value: &str) -> Result<(), String> {
+    if value.is_empty() || matches!(value, "." | "..") {
+        return Err(format!("locator {label} `{value}` is invalid"));
+    }
+    if value
+        .chars()
+        .any(|ch| ch.is_whitespace() || matches!(ch, '/' | '\\' | '\0'))
+    {
+        return Err(format!("locator {label} `{value}` is invalid"));
+    }
+    Ok(())
 }
 
 fn candidate_locator(line: &str) -> Option<SkillsShLocator> {

@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use agent_matters_capabilities::catalog::CatalogIndexStatus;
 use agent_matters_capabilities::sources::{
     CommandOutput, ImportSourceAdapterRequest, ImportSourceError, SkillsShAdapter, SkillsShCommand,
-    SourceAdapter, SourceAdapterError, SourceImportStorageError, SourceSearchRequest,
-    import_source_from_adapter,
+    SourceAdapter, SourceAdapterError, SourceImportRequest, SourceImportStorageError,
+    SourceSearchRequest, import_source_from_adapter,
 };
 use agent_matters_core::domain::Provenance;
 use agent_matters_core::manifest::CapabilityManifest;
@@ -57,6 +57,19 @@ impl SkillsShCommand for MockSkillsCommand {
             fs::write(path, contents)?;
         }
         Ok(self.add.clone())
+    }
+}
+
+#[derive(Clone)]
+struct RejectingAddCommand;
+
+impl SkillsShCommand for RejectingAddCommand {
+    fn find(&self, _query: &str) -> io::Result<CommandOutput> {
+        Ok(success_output())
+    }
+
+    fn add(&self, _package: &str, _skill: &str, _workdir: &Path) -> io::Result<CommandOutput> {
+        Err(io::Error::other("add should not run for invalid locators"))
     }
 }
 
@@ -139,6 +152,21 @@ fn skills_sh_search_reports_malformed_output() {
 
     assert!(matches!(err, SourceAdapterError::InvalidRecord { .. }));
     assert_eq!(err.to_diagnostic().code, "source.record-invalid");
+}
+
+#[test]
+fn skills_sh_import_rejects_unsafe_locator_before_command() {
+    for locator in ["../repo@playwright", "owner/repo@play_wright"] {
+        let adapter = SkillsShAdapter::with_command(RejectingAddCommand);
+
+        let err = adapter
+            .import_capability(SourceImportRequest {
+                locator: locator.to_string(),
+            })
+            .unwrap_err();
+
+        assert!(matches!(err, SourceAdapterError::InvalidRecord { .. }));
+    }
 }
 
 #[test]
