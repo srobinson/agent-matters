@@ -79,6 +79,42 @@ fn duplicate_capability_ids_are_reported_without_dropping_manifests() {
 }
 
 #[test]
+fn capability_kind_mismatches_are_reported_without_dropping_manifests() {
+    let root = fixture_path("catalogs/kind-mismatch");
+    let discovery = discover_catalog(&root);
+
+    assert_eq!(discovery.capabilities.len(), 2);
+
+    let manifest_mismatch = discovery
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "catalog.manifest-kind-mismatch")
+        .expect("manifest kind mismatch diagnostic");
+    assert_eq!(manifest_mismatch.severity, DiagnosticSeverity::Error);
+    assert_eq!(
+        manifest_mismatch
+            .location
+            .as_ref()
+            .and_then(|location| location.field.as_deref()),
+        Some("id")
+    );
+
+    let directory_mismatch = discovery
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "catalog.directory-kind-mismatch")
+        .expect("directory kind mismatch diagnostic");
+    assert_eq!(directory_mismatch.severity, DiagnosticSeverity::Error);
+    assert_eq!(
+        directory_mismatch
+            .location
+            .as_ref()
+            .and_then(|location| location.field.as_deref()),
+        Some("kind")
+    );
+}
+
+#[test]
 fn malformed_toml_missing_manifest_and_unknown_folder_are_reported() {
     let root = fixture_path("catalogs/broken");
     let discovery = discover_catalog(&root);

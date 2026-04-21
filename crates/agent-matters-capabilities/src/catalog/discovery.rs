@@ -59,11 +59,19 @@ fn discover_capabilities(repo_root: &Path, discovery: &mut CatalogDiscovery) {
             }
             let manifest_path = path.join(MANIFEST_FILE_NAME);
             match load_manifest::<CapabilityManifest>(&manifest_path, &mut discovery.diagnostics) {
-                Some(manifest) => discovery.capabilities.push(DiscoveredManifest {
-                    manifest,
-                    manifest_path,
-                    directory_path: path,
-                }),
+                Some(manifest) => {
+                    report_capability_kind_mismatches(
+                        *kind,
+                        &manifest,
+                        &manifest_path,
+                        &mut discovery.diagnostics,
+                    );
+                    discovery.capabilities.push(DiscoveredManifest {
+                        manifest,
+                        manifest_path,
+                        directory_path: path,
+                    });
+                }
                 None if !manifest_path.exists() => report_missing_manifest(
                     &manifest_path,
                     "capability directory is missing manifest.toml",
@@ -217,6 +225,48 @@ fn report_missing_manifest(path: &Path, message: &str, diagnostics: &mut Vec<Dia
         .with_location(DiagnosticLocation::manifest_path(path))
         .with_recovery_hint("add a manifest.toml file to this directory"),
     );
+}
+
+fn report_capability_kind_mismatches(
+    expected_kind: CapabilityKind,
+    manifest: &CapabilityManifest,
+    manifest_path: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if manifest.id.kind() != manifest.kind {
+        diagnostics.push(
+            Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "catalog.manifest-kind-mismatch",
+                format!(
+                    "capability id kind `{}` does not match manifest kind `{}`",
+                    manifest.id.kind(),
+                    manifest.kind
+                ),
+            )
+            .with_location(DiagnosticLocation::manifest_field(manifest_path, "id"))
+            .with_recovery_hint("make the capability id prefix and kind field match"),
+        );
+    }
+
+    if manifest.kind != expected_kind {
+        diagnostics.push(
+            Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "catalog.directory-kind-mismatch",
+                format!(
+                    "capability kind `{}` belongs under `catalog/{}`, not `catalog/{}`",
+                    manifest.kind,
+                    capability_kind_dir_name(manifest.kind),
+                    capability_kind_dir_name(expected_kind)
+                ),
+            )
+            .with_location(DiagnosticLocation::manifest_field(manifest_path, "kind"))
+            .with_recovery_hint(
+                "move the capability directory under the matching catalog kind folder or update the manifest kind",
+            ),
+        );
+    }
 }
 
 fn report_duplicate_ids(discovery: &mut CatalogDiscovery) {
