@@ -1,0 +1,12 @@
+# User machine config fixture. Mirrors a real `$HOME/.agent-matters/config.toml`
+# layout so that `load_user_config(home)` can be pointed at the fixture's
+# parent directory directly.
+
+default_runtime = "codex"
+
+[runtimes.codex]
+model = "gpt-5.4"
+
+[runtimes.claude]
+model = "claude-sonnet-4.5"
+enabled = true

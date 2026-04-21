@@ -1,0 +1,10 @@
+# Repo markers fixture. Identifies the filenames that, when present in a
+# directory, mark it as a project root during scope validation and JIT
+# workspace discovery.
+
+project_markers = [
+    ".git",
+    "Cargo.toml",
+    "package.json",
+    "pyproject.toml",
+]
