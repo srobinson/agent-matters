@@ -54,6 +54,16 @@ fn profiles_list_advertises_json_flag() {
 }
 
 #[test]
+fn profiles_list_help_uses_generated_text_and_examples() {
+    bin()
+        .args(["profiles", "list", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("Each profile line shows the profile id"))
+        .stdout(contains("agent-matters profiles list --json"));
+}
+
+#[test]
 fn capabilities_show_advertises_json_flag() {
     bin()
         .args(["capabilities", "show", "--help"])
@@ -69,6 +79,16 @@ fn sources_search_advertises_json_flag() {
         .assert()
         .success()
         .stdout(contains("--json"));
+}
+
+#[test]
+fn sources_import_help_uses_generated_text_and_examples() {
+    bin()
+        .args(["sources", "import", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("vendor record plus an empty overlay"))
+        .stdout(contains("skills.sh://author/name@1.2.0"));
 }
 
 #[test]

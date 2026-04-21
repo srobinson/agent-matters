@@ -6,22 +6,35 @@
 
 use clap::Subcommand;
 
+use super::{generated_help, help_text};
+
 /// Verbs for `agent-matters sources`.
 #[derive(Debug, Subcommand)]
 pub enum SourcesCmd {
     /// Search a registered source for entries matching a query.
+    #[command(
+        long_about = generated_help::SOURCES_SEARCH_ABOUT,
+        after_help = help_text::SOURCES_SEARCH_AFTER_HELP
+    )]
     Search {
         /// Source identifier (for example `skills.sh`).
+        #[arg(help = generated_help::SOURCES_SEARCH_SOURCE_HELP)]
         source: String,
         /// Free form search query.
+        #[arg(help = generated_help::SOURCES_SEARCH_QUERY_HELP)]
         query: String,
         /// Emit JSON instead of human readable output.
-        #[arg(short = 'j', long)]
+        #[arg(short = 'j', long, help = generated_help::SOURCES_SEARCH_JSON_HELP)]
         json: bool,
     },
     /// Import a capability from a source by locator.
+    #[command(
+        long_about = generated_help::SOURCES_IMPORT_ABOUT,
+        after_help = help_text::SOURCES_IMPORT_AFTER_HELP
+    )]
     Import {
         /// Source specific locator.
+        #[arg(help = generated_help::SOURCES_IMPORT_LOCATOR_HELP)]
         locator: String,
     },
 }

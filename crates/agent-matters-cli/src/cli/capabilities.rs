@@ -6,29 +6,45 @@
 
 use clap::Subcommand;
 
+use super::{generated_help, help_text};
+
 /// Verbs for `agent-matters capabilities`.
 #[derive(Debug, Subcommand)]
 pub enum CapabilitiesCmd {
     /// List capabilities discovered in the catalog.
+    #[command(
+        long_about = generated_help::CAPABILITIES_LIST_ABOUT,
+        after_help = help_text::CAPABILITIES_LIST_AFTER_HELP
+    )]
     List {
         /// Emit JSON instead of human readable output.
-        #[arg(short = 'j', long)]
+        #[arg(short = 'j', long, help = generated_help::CAPABILITIES_LIST_JSON_HELP)]
         json: bool,
     },
     /// Show a single capability and its metadata.
+    #[command(
+        long_about = generated_help::CAPABILITIES_SHOW_ABOUT,
+        after_help = help_text::CAPABILITIES_SHOW_AFTER_HELP
+    )]
     Show {
         /// Capability identifier.
+        #[arg(help = generated_help::CAPABILITIES_SHOW_CAPABILITY_HELP)]
         capability: String,
         /// Emit JSON instead of human readable output.
-        #[arg(short = 'j', long)]
+        #[arg(short = 'j', long, help = generated_help::CAPABILITIES_SHOW_JSON_HELP)]
         json: bool,
     },
     /// Diff a capability overlay against its vendor record.
+    #[command(
+        long_about = generated_help::CAPABILITIES_DIFF_ABOUT,
+        after_help = help_text::CAPABILITIES_DIFF_AFTER_HELP
+    )]
     Diff {
         /// Capability identifier.
+        #[arg(help = generated_help::CAPABILITIES_DIFF_CAPABILITY_HELP)]
         capability: String,
         /// Emit JSON instead of human readable output.
-        #[arg(short = 'j', long)]
+        #[arg(short = 'j', long, help = generated_help::CAPABILITIES_DIFF_JSON_HELP)]
         json: bool,
     },
 }

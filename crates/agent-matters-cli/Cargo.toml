@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "CLI for agent-matters runtime profiles"
+build = "build.rs"
 
 [lib]
 name = "agent_matters_cli"
@@ -25,3 +26,8 @@ anyhow = { workspace = true }
 [dev-dependencies]
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
+
+[build-dependencies]
+serde = { workspace = true }
+indexmap = { workspace = true }
+toml = { workspace = true }
