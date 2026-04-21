@@ -10,3 +10,6 @@ description = "Pure domain types and manifest contracts for agent-matters runtim
 [dependencies]
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+toml = { workspace = true }

@@ -11,6 +11,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod config;
+
 /// Crate version exposed for diagnostics and version banners.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
