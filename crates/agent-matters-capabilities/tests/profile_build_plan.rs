@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use agent_matters_capabilities::profiles::{
-    BuildProfilePlanRequest, ProfileBuildPlan, plan_profile_build,
+    BuildProfilePlanRequest, ProfileBuildPlan, adapter_for_runtime, plan_profile_build,
 };
 use agent_matters_core::domain::DiagnosticSeverity;
 use serde_json::{Value, json};
@@ -125,6 +125,18 @@ fn fingerprint_excludes_unrelated_environment_values() {
     }
 
     assert_eq!(first.fingerprint, second.fingerprint);
+}
+
+#[test]
+fn adapter_version_is_read_from_registered_runtime_adapter() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let build_plan = plan(repo.path(), state.path());
+    let adapter = adapter_for_runtime(&build_plan.runtime).unwrap();
+
+    assert_eq!(build_plan.adapter_version, adapter.version());
+    assert_eq!(build_plan.adapter_version, "agent-matters:codex:adapter:v1");
+    assert_eq!(build_plan.fingerprint, "fnv64:cd7453c6604d912f");
 }
 
 #[test]

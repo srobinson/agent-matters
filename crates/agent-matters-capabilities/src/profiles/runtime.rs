@@ -14,9 +14,10 @@ use crate::config::{
     ConfigError, load_runtime_defaults, load_runtime_settings, load_user_config_from_state_dir,
 };
 
+use super::{runtime_adapter_ids, runtime_adapters};
+
 const RUNTIME_SETTING_KIND: &str = "runtime-setting";
 const SETTINGS_FILE_KEY: &str = "settings";
-const KNOWN_RUNTIME_IDS: [&str; 2] = ["claude", "codex"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ResolvedRuntimeConfig {
@@ -116,9 +117,9 @@ pub(crate) fn resolve_runtime_configs(
 }
 
 fn adapter_defaults() -> BTreeMap<String, RuntimeSettings> {
-    KNOWN_RUNTIME_IDS
+    runtime_adapters()
         .into_iter()
-        .map(|runtime| (runtime.to_string(), RuntimeSettings::default()))
+        .map(|adapter| (adapter.id().to_string(), adapter.default_settings()))
         .collect()
 }
 
@@ -236,11 +237,14 @@ fn select_default_runtime(
 }
 
 fn known_runtime_ids() -> BTreeSet<String> {
-    KNOWN_RUNTIME_IDS.into_iter().map(str::to_string).collect()
+    runtime_adapter_ids()
+        .into_iter()
+        .map(str::to_string)
+        .collect()
 }
 
 fn known_runtime_list() -> String {
-    KNOWN_RUNTIME_IDS.join(", ")
+    runtime_adapter_ids().join(", ")
 }
 
 fn config_load_error(label: &str, error: &ConfigError) -> Diagnostic {

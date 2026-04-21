@@ -47,7 +47,7 @@ pub(crate) struct AssembleProfileInstructionsResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AssembledProfileInstructions {
+pub struct AssembledProfileInstructions {
     pub relative_path: PathBuf,
     pub content: String,
 }

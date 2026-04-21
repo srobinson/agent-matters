@@ -20,7 +20,8 @@ use crate::catalog::CatalogIndexError;
 
 use super::{
     BuildPlanInstructionOutput, ResolveProfileRequest, ResolvedInstructionFragment,
-    ResolvedRuntimeConfig, resolve_instruction_output, resolve_profile,
+    ResolvedRuntimeConfig, adapter_for_runtime, resolve_instruction_output, resolve_profile,
+    unknown_runtime_adapter,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,6 +117,16 @@ pub fn plan_profile_build(
         result.diagnostics = diagnostics;
         return Ok(result);
     };
+    let Some(adapter) = adapter_for_runtime(&runtime_config.id) else {
+        diagnostics.push(unknown_runtime_adapter(&runtime_config.id));
+        result.diagnostics = diagnostics;
+        return Ok(result);
+    };
+    diagnostics.extend(adapter.validate_config(&runtime_config));
+    if has_error_diagnostics(&diagnostics) {
+        result.diagnostics = diagnostics;
+        return Ok(result);
+    }
 
     let instruction_output = resolve_instruction_output(
         &request.repo_root,
@@ -140,7 +151,7 @@ pub fn plan_profile_build(
         return Ok(result);
     }
 
-    let adapter_version = adapter_version(&runtime_config.id);
+    let adapter_version = adapter.version().to_string();
     let fingerprint = build_fingerprint(
         &profile_record,
         &resolved.effective_capabilities,
@@ -339,10 +350,6 @@ fn deduplicate_and_sort(candidates: Vec<ContentInputCandidate>) -> Vec<ContentIn
         ))
     });
     deduped
-}
-
-fn adapter_version(runtime: &str) -> String {
-    format!("agent-matters:{runtime}:adapter:v1")
 }
 
 fn profile_manifest_path(profile_record: &ProfileIndexRecord) -> PathBuf {

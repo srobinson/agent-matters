@@ -2,17 +2,19 @@
 
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use agent_matters_core::runtime::{
-    BUILD_PLAN_FILE_NAME, RUNTIME_HOME_DIR_NAME, runtime_build_plan_file, runtime_pointer_target,
+    BUILD_PLAN_FILE_NAME, RUNTIME_HOME_DIR_NAME, RuntimeHomeFile, runtime_build_plan_file,
+    runtime_pointer_target,
 };
 use serde::Serialize;
 
 use super::{
-    AssembleProfileInstructionsRequest, AssembledProfileInstructions, ProfileBuildPlan,
-    assemble_profile_instructions,
+    AssembleProfileInstructionsRequest, ProfileBuildPlan, RuntimeHomeRenderRequest,
+    RuntimeHomeRenderResult, adapter_for_runtime, assemble_profile_instructions,
+    unknown_runtime_adapter,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,8 +80,22 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
         result.diagnostics = assembled.diagnostics;
         return result;
     };
+    let Some(adapter) = adapter_for_runtime(&request.plan.runtime) else {
+        result
+            .diagnostics
+            .push(unknown_runtime_adapter(&request.plan.runtime));
+        return result;
+    };
+    let home = adapter.render_home(RuntimeHomeRenderRequest {
+        plan: &request.plan,
+        instructions: &instructions,
+    });
+    result.diagnostics.extend(home.diagnostics.clone());
+    if has_error_diagnostics(&result.diagnostics) {
+        return result;
+    }
 
-    let status = match write_immutable_build(&paths, &request.plan, &instructions) {
+    let status = match write_immutable_build(&paths, &request.plan, &home) {
         Ok(status) => status,
         Err(source) => {
             result.diagnostics.push(write_diagnostic(
@@ -118,10 +134,10 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
 fn write_immutable_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
-    instructions: &AssembledProfileInstructions,
+    home: &RuntimeHomeRenderResult,
 ) -> io::Result<ProfileBuildWriteStatus> {
     if paths.build_dir.exists() {
-        validate_existing_build(paths, plan, instructions)?;
+        validate_existing_build(paths, plan, home)?;
         return Ok(ProfileBuildWriteStatus::Reused);
     }
 
@@ -134,19 +150,14 @@ fn write_immutable_build(
     let temp_dir = temp_sibling(&paths.build_dir, "build");
     remove_path_if_exists(&temp_dir)?;
     fs::create_dir_all(temp_dir.join(RUNTIME_HOME_DIR_NAME))?;
-    write_runtime_instructions(
-        &temp_dir
-            .join(RUNTIME_HOME_DIR_NAME)
-            .join(&instructions.relative_path),
-        instructions,
-    )?;
+    write_runtime_home_files(&temp_dir.join(RUNTIME_HOME_DIR_NAME), &home.files)?;
     write_build_plan(&temp_dir.join(BUILD_PLAN_FILE_NAME), plan)?;
 
     match fs::rename(&temp_dir, &paths.build_dir) {
         Ok(()) => Ok(ProfileBuildWriteStatus::Created),
         Err(_source) if paths.build_dir.exists() => {
             remove_path_if_exists(&temp_dir)?;
-            validate_existing_build(paths, plan, instructions)?;
+            validate_existing_build(paths, plan, home)?;
             Ok(ProfileBuildWriteStatus::Reused)
         }
         Err(source) => {
@@ -159,7 +170,7 @@ fn write_immutable_build(
 fn validate_existing_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
-    instructions: &AssembledProfileInstructions,
+    home: &RuntimeHomeRenderResult,
 ) -> io::Result<()> {
     if !paths.build_dir.is_dir() {
         return Err(io::Error::new(
@@ -179,7 +190,7 @@ fn validate_existing_build(
             "build path exists without build plan metadata",
         ));
     }
-    validate_existing_runtime_instructions(paths, instructions)?;
+    validate_existing_runtime_home(paths, &home.files)?;
     validate_existing_build_plan(paths, plan)?;
     Ok(())
 }
@@ -211,35 +222,65 @@ fn write_build_plan(path: &Path, plan: &ProfileBuildPlan) -> io::Result<()> {
     fs::write(path, encoded)
 }
 
-fn write_runtime_instructions(
-    path: &Path,
-    instructions: &AssembledProfileInstructions,
-) -> io::Result<()> {
-    fs::write(path, &instructions.content)
-}
-
-fn validate_existing_runtime_instructions(
-    paths: &AbsoluteBuildPaths,
-    instructions: &AssembledProfileInstructions,
-) -> io::Result<()> {
-    let path = paths.home_dir.join(&instructions.relative_path);
-    let existing = fs::read_to_string(&path).map_err(|source| {
-        if source.kind() == io::ErrorKind::NotFound {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "build path exists without runtime instructions",
-            )
-        } else {
-            source
+fn write_runtime_home_files(home_dir: &Path, files: &[RuntimeHomeFile]) -> io::Result<()> {
+    for file in files {
+        let path = runtime_home_file_path(home_dir, &file.relative_path)?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
         }
-    })?;
-    if existing != instructions.content {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "existing runtime instructions do not match requested plan",
-        ));
+        fs::write(path, &file.contents)?;
     }
     Ok(())
+}
+
+fn validate_existing_runtime_home(
+    paths: &AbsoluteBuildPaths,
+    files: &[RuntimeHomeFile],
+) -> io::Result<()> {
+    for file in files {
+        let path = runtime_home_file_path(&paths.home_dir, &file.relative_path)?;
+        let existing = fs::read(&path).map_err(|source| {
+            if source.kind() == io::ErrorKind::NotFound {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "build path exists without runtime home file `{}`",
+                        file.relative_path.display()
+                    ),
+                )
+            } else {
+                source
+            }
+        })?;
+        if existing != file.contents {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "existing runtime home file `{}` does not match requested plan",
+                    file.relative_path.display()
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn runtime_home_file_path(home_dir: &Path, relative_path: &Path) -> io::Result<PathBuf> {
+    if relative_path.is_absolute()
+        || relative_path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "runtime home file path `{}` must be relative",
+                relative_path.display()
+            ),
+        ));
+    }
+
+    Ok(home_dir.join(relative_path))
 }
 
 fn update_runtime_pointer(pointer_path: &Path, pointer_target: &Path) -> io::Result<()> {

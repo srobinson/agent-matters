@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::profiles::{UseProfileRequest, use_profile};
 use agent_matters_core::domain::DiagnosticSeverity;
+use serde_json::json;
 use tempfile::TempDir;
 
 fn copy_dir(from: &Path, to: &Path) {
@@ -70,6 +71,38 @@ fn use_profile_writes_runtime_home_and_launches_explicit_path() {
         ]
     );
     assert!(build.runtime_pointer.exists());
+}
+
+#[test]
+fn use_profile_launch_instructions_have_stable_json_shape() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+
+    let result = use_profile(use_request(repo.path(), state.path(), workspace.path())).unwrap();
+    let build = result.build.as_ref().unwrap();
+    let launch = result.launch.as_ref().unwrap();
+    let workspace = fs::canonicalize(workspace.path())
+        .unwrap()
+        .display()
+        .to_string();
+    let runtime_home = build.runtime_pointer.display().to_string();
+    let command = format!(
+        "CODEX_HOME={} codex -C {}",
+        build.runtime_pointer.display(),
+        workspace
+    );
+
+    assert_eq!(
+        serde_json::to_value(launch).unwrap(),
+        json!({
+            "env": {
+                "CODEX_HOME": runtime_home,
+            },
+            "args": ["codex", "-C", workspace],
+            "command": command,
+        })
+    );
 }
 
 #[test]

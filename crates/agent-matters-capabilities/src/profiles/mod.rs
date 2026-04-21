@@ -1,5 +1,6 @@
 //! Profile use cases.
 
+mod adapter;
 mod build_plan;
 mod build_writer;
 mod compile;
@@ -13,6 +14,12 @@ mod scope_git;
 mod show;
 mod use_profile;
 
+pub(crate) use adapter::unknown_runtime_adapter;
+pub use adapter::{
+    CLAUDE_RUNTIME_ID, CODEX_RUNTIME_ID, RuntimeAdapter, RuntimeHomeRenderRequest,
+    RuntimeHomeRenderResult, RuntimeLaunchRequest, adapter_for_runtime, runtime_adapter_ids,
+    runtime_adapters,
+};
 pub use build_plan::{
     BuildPlanContentInput, BuildPlanPaths, BuildProfilePlanRequest, BuildProfilePlanResult,
     ProfileBuildPlan, plan_profile_build,
@@ -22,10 +29,10 @@ pub use build_writer::{
     WrittenProfileBuild, write_profile_build,
 };
 pub use compile::{CompileProfileBuildRequest, CompileProfileBuildResult, compile_profile_build};
+pub use instructions::AssembledProfileInstructions;
 pub use instructions::BuildPlanInstructionOutput;
 pub(crate) use instructions::{
-    AssembleProfileInstructionsRequest, AssembledProfileInstructions,
-    assemble_profile_instructions, resolve_instruction_output,
+    AssembleProfileInstructionsRequest, assemble_profile_instructions, resolve_instruction_output,
 };
 pub use list::{ListProfilesRequest, ListProfilesResult, list_profiles};
 pub(crate) use requirements::validate_resolved_capability_requirements;
