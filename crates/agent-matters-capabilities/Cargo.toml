@@ -1,0 +1,11 @@
+[package]
+name = "agent-matters-capabilities"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Use cases and orchestration for agent-matters runtime profiles"
+
+[dependencies]
+agent-matters-core = { workspace = true }
+anyhow = { workspace = true }

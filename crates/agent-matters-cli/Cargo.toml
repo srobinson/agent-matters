@@ -1,0 +1,25 @@
+[package]
+name = "agent-matters-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for agent-matters runtime profiles"
+
+[lib]
+name = "agent_matters_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-matters"
+path = "src/main.rs"
+
+[dependencies]
+agent-matters-capabilities = { workspace = true }
+agent-matters-core = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }

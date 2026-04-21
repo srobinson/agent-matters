@@ -1,0 +1,11 @@
+[package]
+name = "agent-matters-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pure domain types and manifest contracts for agent-matters runtime profiles"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
