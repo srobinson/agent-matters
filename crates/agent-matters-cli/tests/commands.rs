@@ -4,6 +4,8 @@
 //! clap error handling for unknown commands, and clear behavior for verbs
 //! whose implementation has not landed yet.
 
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
@@ -96,8 +98,8 @@ fn sources_import_help_uses_generated_text_and_examples() {
         .args(["sources", "import", "--help"])
         .assert()
         .success()
-        .stdout(contains("vendor record plus an empty overlay"))
-        .stdout(contains("skills.sh://author/name@1.2.0"));
+        .stdout(contains("preserves raw source material under `vendor`"))
+        .stdout(contains("skills.sh:owner/repo@skill-name"));
 }
 
 #[test]
@@ -321,16 +323,6 @@ fn capabilities_diff_reports_overlay_changes() {
 }
 
 #[test]
-fn remaining_not_implemented_verbs_fail_with_clear_message() {
-    bin()
-        .args(["sources", "import", "skills.sh:playwright"])
-        .assert()
-        .failure()
-        .code(1)
-        .stderr(contains("not yet implemented"));
-}
-
-#[test]
 fn completions_bash_emits_script() {
     bin()
         .args(["completions", "bash"])
@@ -347,4 +339,140 @@ fn profiles_compile_requires_runtime() {
         .failure()
         .code(2)
         .stderr(contains("--runtime"));
+}
+
+#[test]
+fn sources_search_renders_mocked_skills_results() {
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+
+    bin()
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "search", "skills.sh", "playwright"])
+        .assert()
+        .success()
+        .stdout(contains("owner/repo@playwright"))
+        .stdout(contains("2 installs"));
+}
+
+#[test]
+fn sources_search_json_renders_mocked_skills_results() {
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+
+    bin()
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "search", "skills.sh", "playwright", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"source\": \"skills.sh\""))
+        .stdout(contains("\"locator\": \"owner/repo@playwright\""));
+}
+
+#[test]
+fn sources_search_failure_emits_diagnostic() {
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_script(
+        &tools,
+        "fake-skills-fail",
+        "#!/bin/sh\nprintf 'npm offline\\n' >&2\nexit 1\n",
+    );
+
+    bin()
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "search", "skills.sh", "playwright"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(contains("source.search-failed"))
+        .stderr(contains("npm offline"));
+}
+
+#[test]
+fn sources_import_writes_catalog_vendor_and_index() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", "skills.sh:owner/repo@playwright"])
+        .assert()
+        .success()
+        .stdout(contains("Imported skill:playwright"))
+        .stdout(contains(
+            "manifest\tcatalog/skills/playwright/manifest.toml",
+        ))
+        .stdout(contains("vendor\tvendor/skills.sh/owner/repo@playwright"));
+
+    assert!(
+        repo.path()
+            .join("catalog/skills/playwright/manifest.toml")
+            .exists()
+    );
+    assert!(
+        repo.path()
+            .join("vendor/skills.sh/owner/repo@playwright/record.json")
+            .exists()
+    );
+    assert!(state.path().join("indexes/catalog.json").exists());
+}
+
+fn write_fake_skills_bin(dir: &TempDir) -> PathBuf {
+    write_script(
+        dir,
+        "fake-skills",
+        r#"#!/bin/sh
+set -eu
+case "$1" in
+  find)
+    if [ "${2:-}" = "none" ]; then
+      printf 'No skills found for "none"\n'
+      exit 0
+    fi
+    printf 'owner/repo@playwright 2 installs\n'
+    printf '%s\n' '-> https://skills.sh/owner/repo/playwright'
+    ;;
+  add)
+    skill=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "--skill" ]; then
+        shift
+        skill="$1"
+      fi
+      shift || true
+    done
+    mkdir -p ".agents/skills/$skill/docs"
+    cat > ".agents/skills/$skill/SKILL.md" <<'SKILL'
+---
+name: playwright
+description: Mock Playwright skill.
+metadata:
+  version: "2.0.0"
+---
+
+# Playwright
+SKILL
+    printf 'Details.\n' > ".agents/skills/$skill/docs/usage.md"
+    printf 'installed\n'
+    ;;
+  *)
+    printf 'unsupported command\n' >&2
+    exit 2
+    ;;
+esac
+"#,
+    )
+}
+
+fn write_script(dir: &TempDir, name: &str, contents: &str) -> PathBuf {
+    let path = dir.path().join(name);
+    fs::write(&path, contents).unwrap();
+    let mut permissions = fs::metadata(&path).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&path, permissions).unwrap();
+    path
 }

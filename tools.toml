@@ -217,8 +217,9 @@ cli_help = "Emit machine readable JSON instead of the human table"
 cli_about = """
 Import a capability from a source by locator.
 
-Writes the imported files into the catalog as a vendor record plus an empty \
-overlay, and records provenance so future syncs and diffs can detect drift.
+Writes normalized capability files into the catalog, preserves raw source \
+material under `vendor`, and records provenance so future syncs and diffs can \
+detect drift.
 """
 
 [[tools.sources-import.params]]

@@ -64,7 +64,7 @@ pub const SOURCES_SEARCH_QUERY_HELP: &str = "Free form search query";
 pub const SOURCES_SEARCH_JSON_HELP: &str = "Emit machine readable JSON instead of the human table";
 
 #[rustfmt::skip]
-pub const SOURCES_IMPORT_ABOUT: &str = "Import a capability from a source by locator.\n\nWrites the imported files into the catalog as a vendor record plus an empty overlay, and records provenance so future syncs and diffs can detect drift.";
+pub const SOURCES_IMPORT_ABOUT: &str = "Import a capability from a source by locator.\n\nWrites normalized capability files into the catalog, preserves raw source material under `vendor`, and records provenance so future syncs and diffs can detect drift.";
 #[rustfmt::skip]
 pub const SOURCES_IMPORT_LOCATOR_HELP: &str = "Source specific locator (scheme determined by the source adapter)";
 

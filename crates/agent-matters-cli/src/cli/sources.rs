@@ -1,12 +1,15 @@
 //! `agent-matters sources` subcommand surface.
 //!
-//! Handler stubs return `not yet implemented` until the relevant use case
-//! ships. Concrete behaviors land in ALP-1946 (skills.sh search and import)
-//! and ALP-1950 (trust policy).
+//! The CLI stays a thin adapter over the source search and import use cases.
 
+use std::path::Path;
+
+use agent_matters_capabilities::sources::{
+    ImportSourceRequest, SearchSourceRequest, import_source, search_source,
+};
 use clap::Subcommand;
 
-use super::{generated_help, help_text};
+use super::{default_catalog_paths, emit_diagnostics, generated_help, help_text};
 
 /// Verbs for `agent-matters sources`.
 #[derive(Debug, Subcommand)]
@@ -51,10 +54,81 @@ pub fn dispatch(cmd: SourcesCmd) -> anyhow::Result<i32> {
     }
 }
 
-fn run_search(_source: &str, _query: &str, _json: bool) -> anyhow::Result<i32> {
-    anyhow::bail!("sources search: not yet implemented (ALP-1946)")
+fn run_search(source: &str, query: &str, json: bool) -> anyhow::Result<i32> {
+    match search_source(SearchSourceRequest {
+        source: source.to_string(),
+        query: query.to_string(),
+    }) {
+        Ok(result) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                emit_diagnostics(&result.diagnostics);
+                render_search(&result);
+            }
+            Ok(0)
+        }
+        Err(err) => {
+            let diagnostic = err.to_diagnostic();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&vec![diagnostic])?);
+            } else {
+                emit_diagnostics(&[diagnostic]);
+            }
+            Ok(1)
+        }
+    }
 }
 
-fn run_import(_locator: &str) -> anyhow::Result<i32> {
-    anyhow::bail!("sources import: not yet implemented (ALP-1946)")
+fn run_import(locator: &str) -> anyhow::Result<i32> {
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    match import_source(ImportSourceRequest {
+        repo_root: repo_root.clone(),
+        user_state_dir,
+        locator: locator.to_string(),
+        replace_existing: false,
+    }) {
+        Ok(result) => {
+            emit_diagnostics(&result.diagnostics);
+            println!("Imported {}", result.capability_id);
+            println!("source\t{}:{}", result.source, result.locator);
+            println!(
+                "manifest\t{}",
+                display_path(&repo_root, &result.manifest_path)
+            );
+            println!("vendor\t{}", display_path(&repo_root, &result.vendor_dir));
+            println!("index\t{}", result.index_path.display());
+            Ok(0)
+        }
+        Err(err) => {
+            emit_diagnostics(&[err.to_diagnostic()]);
+            Ok(1)
+        }
+    }
+}
+
+fn render_search(result: &agent_matters_capabilities::sources::SourceSearchResult) {
+    if result.entries.is_empty() {
+        println!(
+            "No results found for `{}` in `{}`.",
+            result.query, result.source
+        );
+        return;
+    }
+
+    for entry in &result.entries {
+        println!(
+            "{}\t{}\t{}",
+            entry.locator,
+            entry.version.as_deref().unwrap_or("-"),
+            entry.summary.as_deref().unwrap_or("-")
+        );
+    }
+}
+
+fn display_path(repo_root: &Path, path: &Path) -> String {
+    path.strip_prefix(repo_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .to_string()
 }
