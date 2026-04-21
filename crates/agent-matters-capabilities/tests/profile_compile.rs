@@ -35,15 +35,18 @@ fn valid_repo() -> TempDir {
 }
 
 fn compile(repo_root: &Path, state: &Path) -> CompileProfileBuildResult {
-    let result = compile_profile_build(CompileProfileBuildRequest {
+    let result = compile_profile_build(compile_request(repo_root, state)).unwrap();
+    assert_eq!(result.diagnostics, Vec::new());
+    result
+}
+
+fn compile_request(repo_root: &Path, state: &Path) -> CompileProfileBuildRequest {
+    CompileProfileBuildRequest {
         repo_root: repo_root.to_path_buf(),
         user_state_dir: state.to_path_buf(),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
-    })
-    .unwrap();
-    assert_eq!(result.diagnostics, Vec::new());
-    result
+    }
 }
 
 #[test]
@@ -84,6 +87,26 @@ fn compile_reuses_existing_build_for_same_fingerprint() {
     assert_eq!(
         fs::read_link(&second.runtime_pointer).unwrap(),
         second.pointer_target
+    );
+}
+
+#[test]
+fn compile_rejects_existing_build_with_mismatched_metadata() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let first = compile(repo.path(), state.path()).build.unwrap();
+    fs::write(&first.build_plan_path, "{}\n").unwrap();
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert!(result.build.is_none());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+    assert_eq!(result.diagnostics[0].code, "profile.build.write-failed");
+    assert!(
+        result.diagnostics[0]
+            .message
+            .contains("existing build plan metadata does not match requested plan")
     );
 }
 

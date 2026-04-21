@@ -102,7 +102,7 @@ fn write_immutable_build(
     plan: &ProfileBuildPlan,
 ) -> io::Result<ProfileBuildWriteStatus> {
     if paths.build_dir.exists() {
-        validate_existing_build(paths)?;
+        validate_existing_build(paths, plan)?;
         return Ok(ProfileBuildWriteStatus::Reused);
     }
 
@@ -121,7 +121,7 @@ fn write_immutable_build(
         Ok(()) => Ok(ProfileBuildWriteStatus::Created),
         Err(_source) if paths.build_dir.exists() => {
             remove_path_if_exists(&temp_dir)?;
-            validate_existing_build(paths)?;
+            validate_existing_build(paths, plan)?;
             Ok(ProfileBuildWriteStatus::Reused)
         }
         Err(source) => {
@@ -131,7 +131,7 @@ fn write_immutable_build(
     }
 }
 
-fn validate_existing_build(paths: &AbsoluteBuildPaths) -> io::Result<()> {
+fn validate_existing_build(paths: &AbsoluteBuildPaths, plan: &ProfileBuildPlan) -> io::Result<()> {
     if !paths.build_dir.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
@@ -148,6 +148,28 @@ fn validate_existing_build(paths: &AbsoluteBuildPaths) -> io::Result<()> {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "build path exists without build plan metadata",
+        ));
+    }
+    validate_existing_build_plan(paths, plan)?;
+    Ok(())
+}
+
+fn validate_existing_build_plan(
+    paths: &AbsoluteBuildPaths,
+    plan: &ProfileBuildPlan,
+) -> io::Result<()> {
+    let encoded = fs::read_to_string(&paths.build_plan_path)?;
+    let existing: serde_json::Value = serde_json::from_str(&encoded).map_err(|source| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("existing build plan metadata is invalid: {source}"),
+        )
+    })?;
+    let expected = serde_json::to_value(plan).map_err(io::Error::other)?;
+    if existing != expected {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "existing build plan metadata does not match requested plan",
         ));
     }
     Ok(())
