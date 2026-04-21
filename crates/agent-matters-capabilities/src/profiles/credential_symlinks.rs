@@ -11,7 +11,7 @@ use super::RuntimeAdapter;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CredentialSymlink {
-    source_path: PathBuf,
+    source_path: Option<PathBuf>,
     target_path: PathBuf,
 }
 
@@ -34,7 +34,7 @@ pub(super) fn credential_symlinks_for_adapter(
 
     allowlist
         .iter()
-        .filter_map(|entry| credential_symlink(adapter.id(), &source_dir, entry, diagnostics))
+        .map(|entry| credential_symlink(adapter.id(), &source_dir, entry, diagnostics))
         .collect()
 }
 
@@ -44,10 +44,14 @@ pub(super) fn write_credential_symlinks(
 ) -> io::Result<()> {
     for symlink in credential_symlinks {
         let link = runtime_home_link_path(home_dir, &symlink.target_path)?;
-        if let Some(parent) = link.parent() {
-            fs::create_dir_all(parent)?;
+        if let Some(source_path) = &symlink.source_path {
+            if let Some(parent) = link.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            upsert_file_symlink(source_path, &link)?;
+        } else {
+            remove_stale_file_symlink(&link)?;
         }
-        upsert_file_symlink(&symlink.source_path, &link)?;
     }
     Ok(())
 }
@@ -57,17 +61,20 @@ fn credential_symlink(
     source_dir: &Path,
     entry: &CredentialSymlinkAllowlistEntry,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<CredentialSymlink> {
+) -> CredentialSymlink {
     let source_path = source_dir.join(&entry.source_name);
     if !source_path.is_file() {
         diagnostics.push(credential_source_missing(runtime, &source_path));
-        return None;
+        return CredentialSymlink {
+            source_path: None,
+            target_path: entry.target_path.clone(),
+        };
     }
 
-    Some(CredentialSymlink {
-        source_path,
+    CredentialSymlink {
+        source_path: Some(source_path),
         target_path: entry.target_path.clone(),
-    })
+    }
 }
 
 fn runtime_home_link_path(home_dir: &Path, relative_path: &Path) -> io::Result<PathBuf> {
@@ -110,6 +117,21 @@ fn upsert_file_symlink(target: &Path, link: &Path) -> io::Result<()> {
     }
 
     create_file_symlink(target, link)
+}
+
+fn remove_stale_file_symlink(link: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(link) {
+        Ok(metadata) if metadata.file_type().is_symlink() => fs::remove_file(link),
+        Ok(_) => Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "credential link path `{}` exists and is not a symlink",
+                link.display()
+            ),
+        )),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(source),
+    }
 }
 
 #[cfg(unix)]
