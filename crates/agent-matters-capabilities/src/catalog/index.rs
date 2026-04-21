@@ -301,6 +301,16 @@ fn profile_record(repo_root: &Path, entry: &DiscoveredProfileManifest) -> Profil
         id: manifest.id.to_string(),
         kind: manifest.kind.as_str().to_string(),
         summary: manifest.summary.clone(),
+        capabilities: manifest
+            .capabilities
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        instructions: manifest
+            .instructions
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
         source_path: relative_path(repo_root, &entry.directory_path),
         runtimes,
         default_runtime,
