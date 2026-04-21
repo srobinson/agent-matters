@@ -10,10 +10,14 @@ use agent_matters_core::runtime::{
 };
 use serde::Serialize;
 
-use super::ProfileBuildPlan;
+use super::{
+    AssembleProfileInstructionsRequest, AssembledProfileInstructions, ProfileBuildPlan,
+    assemble_profile_instructions,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WriteProfileBuildRequest {
+    pub repo_root: PathBuf,
     pub user_state_dir: PathBuf,
     pub plan: ProfileBuildPlan,
 }
@@ -60,8 +64,22 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
         build: None,
         diagnostics: Vec::new(),
     };
+    let assembled = assemble_profile_instructions(AssembleProfileInstructionsRequest {
+        repo_root: &request.repo_root,
+        profile: &request.plan.profile,
+        fragments: &request.plan.instruction_fragments,
+        output: &request.plan.instruction_output,
+    });
+    if has_error_diagnostics(&assembled.diagnostics) {
+        result.diagnostics = assembled.diagnostics;
+        return result;
+    }
+    let Some(instructions) = assembled.instructions else {
+        result.diagnostics = assembled.diagnostics;
+        return result;
+    };
 
-    let status = match write_immutable_build(&paths, &request.plan) {
+    let status = match write_immutable_build(&paths, &request.plan, &instructions) {
         Ok(status) => status,
         Err(source) => {
             result.diagnostics.push(write_diagnostic(
@@ -100,9 +118,10 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
 fn write_immutable_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
+    instructions: &AssembledProfileInstructions,
 ) -> io::Result<ProfileBuildWriteStatus> {
     if paths.build_dir.exists() {
-        validate_existing_build(paths, plan)?;
+        validate_existing_build(paths, plan, instructions)?;
         return Ok(ProfileBuildWriteStatus::Reused);
     }
 
@@ -115,13 +134,19 @@ fn write_immutable_build(
     let temp_dir = temp_sibling(&paths.build_dir, "build");
     remove_path_if_exists(&temp_dir)?;
     fs::create_dir_all(temp_dir.join(RUNTIME_HOME_DIR_NAME))?;
+    write_runtime_instructions(
+        &temp_dir
+            .join(RUNTIME_HOME_DIR_NAME)
+            .join(&instructions.relative_path),
+        instructions,
+    )?;
     write_build_plan(&temp_dir.join(BUILD_PLAN_FILE_NAME), plan)?;
 
     match fs::rename(&temp_dir, &paths.build_dir) {
         Ok(()) => Ok(ProfileBuildWriteStatus::Created),
         Err(_source) if paths.build_dir.exists() => {
             remove_path_if_exists(&temp_dir)?;
-            validate_existing_build(paths, plan)?;
+            validate_existing_build(paths, plan, instructions)?;
             Ok(ProfileBuildWriteStatus::Reused)
         }
         Err(source) => {
@@ -131,7 +156,11 @@ fn write_immutable_build(
     }
 }
 
-fn validate_existing_build(paths: &AbsoluteBuildPaths, plan: &ProfileBuildPlan) -> io::Result<()> {
+fn validate_existing_build(
+    paths: &AbsoluteBuildPaths,
+    plan: &ProfileBuildPlan,
+    instructions: &AssembledProfileInstructions,
+) -> io::Result<()> {
     if !paths.build_dir.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
@@ -150,6 +179,7 @@ fn validate_existing_build(paths: &AbsoluteBuildPaths, plan: &ProfileBuildPlan) 
             "build path exists without build plan metadata",
         ));
     }
+    validate_existing_runtime_instructions(paths, instructions)?;
     validate_existing_build_plan(paths, plan)?;
     Ok(())
 }
@@ -179,6 +209,37 @@ fn write_build_plan(path: &Path, plan: &ProfileBuildPlan) -> io::Result<()> {
     let mut encoded = serde_json::to_string_pretty(plan).map_err(io::Error::other)?;
     encoded.push('\n');
     fs::write(path, encoded)
+}
+
+fn write_runtime_instructions(
+    path: &Path,
+    instructions: &AssembledProfileInstructions,
+) -> io::Result<()> {
+    fs::write(path, &instructions.content)
+}
+
+fn validate_existing_runtime_instructions(
+    paths: &AbsoluteBuildPaths,
+    instructions: &AssembledProfileInstructions,
+) -> io::Result<()> {
+    let path = paths.home_dir.join(&instructions.relative_path);
+    let existing = fs::read_to_string(&path).map_err(|source| {
+        if source.kind() == io::ErrorKind::NotFound {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "build path exists without runtime instructions",
+            )
+        } else {
+            source
+        }
+    })?;
+    if existing != instructions.content {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "existing runtime instructions do not match requested plan",
+        ));
+    }
+    Ok(())
 }
 
 fn update_runtime_pointer(pointer_path: &Path, pointer_target: &Path) -> io::Result<()> {
@@ -240,6 +301,12 @@ fn write_diagnostic(action: &str, path: &Path, source: &io::Error) -> Diagnostic
     )
     .with_location(DiagnosticLocation::manifest_path(path))
     .with_recovery_hint("check permissions and remove any non-directory path at that location")
+}
+
+fn has_error_diagnostics(diagnostics: &[Diagnostic]) -> bool {
+    diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

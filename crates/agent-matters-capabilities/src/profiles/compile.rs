@@ -40,7 +40,7 @@ pub fn compile_profile_build(
     request: CompileProfileBuildRequest,
 ) -> Result<CompileProfileBuildResult, CatalogIndexError> {
     let plan_result = plan_profile_build(BuildProfilePlanRequest {
-        repo_root: request.repo_root,
+        repo_root: request.repo_root.clone(),
         user_state_dir: request.user_state_dir.clone(),
         profile: request.profile,
         runtime: request.runtime,
@@ -61,6 +61,7 @@ pub fn compile_profile_build(
     };
 
     let write_result = write_profile_build(WriteProfileBuildRequest {
+        repo_root: request.repo_root,
         user_state_dir: request.user_state_dir,
         plan,
     });

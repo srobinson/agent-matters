@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use agent_matters_core::catalog::{CapabilityIndexRecord, MANIFEST_FILE_NAME, ProfileIndexRecord};
 use agent_matters_core::config::{
-    REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, USER_CONFIG_FILE_NAME,
+    MARKERS_FILE_NAME, REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, USER_CONFIG_FILE_NAME,
 };
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use agent_matters_core::runtime::{
@@ -19,7 +19,8 @@ use serde::Serialize;
 use crate::catalog::CatalogIndexError;
 
 use super::{
-    ResolveProfileRequest, ResolvedInstructionFragment, ResolvedRuntimeConfig, resolve_profile,
+    BuildPlanInstructionOutput, ResolveProfileRequest, ResolvedInstructionFragment,
+    ResolvedRuntimeConfig, resolve_instruction_output, resolve_profile,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +59,7 @@ pub struct ProfileBuildPlan {
     pub profile_record: ProfileIndexRecord,
     pub effective_capabilities: Vec<CapabilityIndexRecord>,
     pub instruction_fragments: Vec<ResolvedInstructionFragment>,
+    pub instruction_output: BuildPlanInstructionOutput,
     pub runtime_config: ResolvedRuntimeConfig,
     pub content_inputs: Vec<BuildPlanContentInput>,
 }
@@ -115,6 +117,17 @@ pub fn plan_profile_build(
         return Ok(result);
     };
 
+    let instruction_output = resolve_instruction_output(
+        &request.repo_root,
+        &request.user_state_dir,
+        &profile_record,
+        &mut diagnostics,
+    );
+    if has_error_diagnostics(&diagnostics) {
+        result.diagnostics = diagnostics;
+        return Ok(result);
+    }
+
     let candidates = content_input_candidates(
         &request.repo_root,
         &request.user_state_dir,
@@ -132,6 +145,7 @@ pub fn plan_profile_build(
         &profile_record,
         &resolved.effective_capabilities,
         &resolved.instruction_fragments,
+        &instruction_output,
         &runtime_config,
         &adapter_version,
         &read_inputs,
@@ -156,6 +170,7 @@ pub fn plan_profile_build(
         profile_record,
         effective_capabilities: resolved.effective_capabilities,
         instruction_fragments: resolved.instruction_fragments,
+        instruction_output,
         runtime_config,
         content_inputs: read_inputs
             .into_iter()
@@ -223,8 +238,15 @@ fn content_input_candidates(
         relative_repo_path(&repo_defaults),
         repo_root.join(repo_defaults),
     ));
+    let repo_markers = PathBuf::from(REPO_DEFAULTS_DIR_NAME).join(MARKERS_FILE_NAME);
     candidates.push(ContentInputCandidate::optional(
         4,
+        "repo-marker-defaults",
+        relative_repo_path(&repo_markers),
+        repo_root.join(repo_markers),
+    ));
+    candidates.push(ContentInputCandidate::optional(
+        5,
         "user-config",
         format!("user-state/{USER_CONFIG_FILE_NAME}"),
         user_state_dir.join(USER_CONFIG_FILE_NAME),
@@ -265,6 +287,7 @@ fn build_fingerprint(
     profile_record: &ProfileIndexRecord,
     effective_capabilities: &[CapabilityIndexRecord],
     instruction_fragments: &[ResolvedInstructionFragment],
+    instruction_output: &BuildPlanInstructionOutput,
     runtime_config: &ResolvedRuntimeConfig,
     adapter_version: &str,
     read_inputs: &[ReadContentInput],
@@ -277,6 +300,7 @@ fn build_fingerprint(
         effective_capabilities,
     );
     write_json(&mut hasher, "instruction-fragments", instruction_fragments);
+    write_json(&mut hasher, "instruction-output", instruction_output);
     write_json(&mut hasher, "runtime-config", runtime_config);
     hasher.write_str("adapter-version");
     hasher.write_str(adapter_version);

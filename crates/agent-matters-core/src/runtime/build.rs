@@ -17,6 +17,9 @@ pub const RUNTIMES_DIR_NAME: &str = "runtimes";
 /// Directory inside a build that is directly usable as the runtime home.
 pub const RUNTIME_HOME_DIR_NAME: &str = "home";
 
+/// Runtime instruction file assembled from profile instruction fragments.
+pub const RUNTIME_INSTRUCTIONS_FILE_NAME: &str = "AGENTS.md";
+
 pub fn runtime_build_dir(runtime: &str, profile: &str, build_id: &str) -> PathBuf {
     PathBuf::from(BUILDS_DIR_NAME)
         .join(runtime)

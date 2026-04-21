@@ -18,6 +18,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::manifest::InstructionMarkers;
+
 /// Per-runtime settings shared between repo defaults and user config.
 /// Fields are intentionally permissive for MVP; adapters read the subset
 /// they need and ignore the rest.
@@ -50,6 +52,16 @@ pub struct RuntimeDefaults {
 pub struct Markers {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub project_markers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions_output: Option<InstructionOutputDefaults>,
+}
+
+/// Optional defaults for generated runtime instruction files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InstructionOutputDefaults {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub markers: Option<InstructionMarkers>,
 }
 
 /// Contents of `~/.agent-matters/config.toml`. Only carries values the user
@@ -62,6 +74,8 @@ pub struct UserConfig {
     /// `--runtime` flag and the profile does not pin a single runtime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_runtime: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions_output: Option<InstructionOutputDefaults>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub runtimes: BTreeMap<String, RuntimeSettings>,
 }
@@ -97,11 +111,23 @@ mod tests {
 
     #[test]
     fn markers_deserialize_and_round_trip() {
-        let src = r#"project_markers = [".git", "Cargo.toml"]"#;
+        let src = r#"
+            project_markers = [".git", "Cargo.toml"]
+
+            [instructions_output]
+            markers = "top-notice"
+        "#;
         let parsed: Markers = toml::from_str(src).unwrap();
         assert_eq!(
             parsed.project_markers,
             vec![".git".to_string(), "Cargo.toml".to_string()]
+        );
+        assert_eq!(
+            parsed
+                .instructions_output
+                .as_ref()
+                .and_then(|output| output.markers),
+            Some(InstructionMarkers::TopNotice)
         );
 
         let reserialized = toml::to_string(&parsed).unwrap();
@@ -115,6 +141,24 @@ mod tests {
         let parsed: UserConfig = toml::from_str(src).unwrap();
         assert_eq!(parsed.default_runtime.as_deref(), Some("codex"));
         assert!(parsed.runtimes.is_empty());
+    }
+
+    #[test]
+    fn user_config_deserializes_instruction_output_defaults() {
+        let src = r#"
+            [instructions_output]
+            markers = "none"
+        "#;
+
+        let parsed: UserConfig = toml::from_str(src).unwrap();
+
+        assert_eq!(
+            parsed
+                .instructions_output
+                .as_ref()
+                .and_then(|output| output.markers),
+            Some(InstructionMarkers::None)
+        );
     }
 
     #[test]

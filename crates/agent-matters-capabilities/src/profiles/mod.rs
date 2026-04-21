@@ -3,6 +3,7 @@
 mod build_plan;
 mod build_writer;
 mod compile;
+mod instructions;
 mod list;
 mod requirements;
 mod resolve;
@@ -20,6 +21,11 @@ pub use build_writer::{
     WrittenProfileBuild, write_profile_build,
 };
 pub use compile::{CompileProfileBuildRequest, CompileProfileBuildResult, compile_profile_build};
+pub use instructions::BuildPlanInstructionOutput;
+pub(crate) use instructions::{
+    AssembleProfileInstructionsRequest, AssembledProfileInstructions,
+    assemble_profile_instructions, resolve_instruction_output,
+};
 pub use list::{ListProfilesRequest, ListProfilesResult, list_profiles};
 pub use requirements::{
     CapabilityRequirementCheck, EnvRequirementCheck, ProfileRequirementValidationMode,

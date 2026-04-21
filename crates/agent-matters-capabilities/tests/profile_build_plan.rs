@@ -205,11 +205,11 @@ fn expected_build_plan_json() -> Value {
         "profile": "github-researcher",
         "runtime": "codex",
         "adapter_version": "agent-matters:codex:adapter:v1",
-        "fingerprint": "fnv64:1b4d07bd9e8fd303",
-        "build_id": "1b4d07bd9e8fd303",
+        "fingerprint": "fnv64:cd7453c6604d912f",
+        "build_id": "cd7453c6604d912f",
         "paths": {
-            "build_dir": "builds/codex/github-researcher/1b4d07bd9e8fd303",
-            "home_dir": "builds/codex/github-researcher/1b4d07bd9e8fd303/home",
+            "build_dir": "builds/codex/github-researcher/cd7453c6604d912f",
+            "home_dir": "builds/codex/github-researcher/cd7453c6604d912f/home",
             "runtime_pointer": "runtimes/github-researcher/codex"
         },
         "profile_record": profile_record_json(),
@@ -232,6 +232,9 @@ fn expected_build_plan_json() -> Value {
                 }
             }
         ],
+        "instruction_output": {
+            "markers": "html-comments"
+        },
         "runtime_config": {
             "id": "codex"
         },

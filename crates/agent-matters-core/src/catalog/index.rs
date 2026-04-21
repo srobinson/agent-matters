@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::ScopeConstraints;
+use crate::manifest::InstructionMarkers;
 
-pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 5;
+pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 6;
 pub const INDEXES_DIR_NAME: &str = "indexes";
 pub const CATALOG_INDEX_FILE_NAME: &str = "catalog.json";
 
@@ -71,6 +72,8 @@ pub struct ProfileIndexRecord {
     pub runtimes: BTreeMap<String, RuntimeCompatibilitySummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_runtime: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruction_markers: Option<InstructionMarkers>,
     pub capability_count: usize,
     pub instruction_count: usize,
 }
@@ -149,6 +152,7 @@ mod tests {
             source_path: "profiles/github-researcher".to_string(),
             runtimes: BTreeMap::new(),
             default_runtime: Some("codex".to_string()),
+            instruction_markers: None,
             capability_count: 1,
             instruction_count: 1,
         };

@@ -296,6 +296,10 @@ fn profile_record(repo_root: &Path, entry: &DiscoveredProfileManifest) -> Profil
         .as_ref()
         .and_then(|runtimes| runtimes.default.as_ref())
         .map(ToString::to_string);
+    let instruction_markers = manifest
+        .instructions_output
+        .as_ref()
+        .and_then(|output| output.markers);
 
     ProfileIndexRecord {
         id: manifest.id.to_string(),
@@ -315,6 +319,7 @@ fn profile_record(repo_root: &Path, entry: &DiscoveredProfileManifest) -> Profil
         source_path: relative_path(repo_root, &entry.directory_path),
         runtimes,
         default_runtime,
+        instruction_markers,
         capability_count: manifest.capabilities.len(),
         instruction_count: manifest.instructions.len(),
     }
