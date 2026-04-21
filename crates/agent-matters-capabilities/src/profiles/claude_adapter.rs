@@ -51,6 +51,14 @@ impl RuntimeAdapter for ClaudeRuntimeAdapter {
         renderer.finish()
     }
 
+    fn existing_home_file_matches(&self, file: &RuntimeHomeFile, existing: &[u8]) -> bool {
+        if file.relative_path == Path::new(CLAUDE_JSON_FILE) {
+            return claude_json_mcp_servers_match(&file.contents, existing);
+        }
+
+        file.contents == existing
+    }
+
     fn credential_symlink_allowlist(&self) -> Vec<CredentialSymlinkAllowlistEntry> {
         vec![CredentialSymlinkAllowlistEntry::new(
             ".credentials.json",
@@ -273,6 +281,20 @@ fn add_default_stdio_args(value: &mut Value) {
     {
         server.insert("args".to_string(), Value::Array(Vec::new()));
     }
+}
+
+fn claude_json_mcp_servers_match(expected: &[u8], existing: &[u8]) -> bool {
+    let Ok(expected): Result<Value, _> = serde_json::from_slice(expected) else {
+        return false;
+    };
+    let Ok(existing): Result<Value, _> = serde_json::from_slice(existing) else {
+        return false;
+    };
+    let Some(expected_servers) = expected.get("mcpServers") else {
+        return false;
+    };
+
+    existing.get("mcpServers") == Some(expected_servers)
 }
 
 fn expected_file_mapping<'a>(

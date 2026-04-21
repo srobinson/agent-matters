@@ -105,17 +105,18 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
         return result;
     }
 
-    let status = match write_immutable_build(&paths, &request.plan, &home, &credential_symlinks) {
-        Ok(status) => status,
-        Err(source) => {
-            result.diagnostics.push(write_diagnostic(
-                "write immutable build",
-                &paths.build_dir,
-                &source,
-            ));
-            return result;
-        }
-    };
+    let status =
+        match write_immutable_build(&paths, &request.plan, adapter, &home, &credential_symlinks) {
+            Ok(status) => status,
+            Err(source) => {
+                result.diagnostics.push(write_diagnostic(
+                    "write immutable build",
+                    &paths.build_dir,
+                    &source,
+                ));
+                return result;
+            }
+        };
 
     if let Err(source) = update_runtime_pointer(&paths.runtime_pointer, &paths.pointer_target) {
         result.diagnostics.push(write_diagnostic(
@@ -144,11 +145,12 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
 fn write_immutable_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
+    adapter: &dyn super::RuntimeAdapter,
     home: &RuntimeHomeRenderResult,
     credential_symlinks: &[CredentialSymlink],
 ) -> io::Result<ProfileBuildWriteStatus> {
     if paths.build_dir.exists() {
-        validate_existing_build(paths, plan, home)?;
+        validate_existing_build(paths, plan, adapter, home)?;
         write_credential_symlinks(&paths.home_dir, credential_symlinks)?;
         return Ok(ProfileBuildWriteStatus::Reused);
     }
@@ -170,7 +172,7 @@ fn write_immutable_build(
         Ok(()) => Ok(ProfileBuildWriteStatus::Created),
         Err(_source) if paths.build_dir.exists() => {
             remove_path_if_exists(&temp_dir)?;
-            validate_existing_build(paths, plan, home)?;
+            validate_existing_build(paths, plan, adapter, home)?;
             write_credential_symlinks(&paths.home_dir, credential_symlinks)?;
             Ok(ProfileBuildWriteStatus::Reused)
         }
@@ -184,6 +186,7 @@ fn write_immutable_build(
 fn validate_existing_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
+    adapter: &dyn super::RuntimeAdapter,
     home: &RuntimeHomeRenderResult,
 ) -> io::Result<()> {
     if !paths.build_dir.is_dir() {
@@ -204,7 +207,7 @@ fn validate_existing_build(
             "build path exists without build plan metadata",
         ));
     }
-    validate_existing_runtime_home(paths, &home.files)?;
+    validate_existing_runtime_home(paths, adapter, &home.files)?;
     validate_existing_build_plan(paths, plan)?;
     Ok(())
 }
@@ -249,6 +252,7 @@ fn write_runtime_home_files(home_dir: &Path, files: &[RuntimeHomeFile]) -> io::R
 
 fn validate_existing_runtime_home(
     paths: &AbsoluteBuildPaths,
+    adapter: &dyn super::RuntimeAdapter,
     files: &[RuntimeHomeFile],
 ) -> io::Result<()> {
     for file in files {
@@ -266,7 +270,7 @@ fn validate_existing_runtime_home(
                 source
             }
         })?;
-        if existing != file.contents {
+        if !adapter.existing_home_file_matches(file, &existing) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(

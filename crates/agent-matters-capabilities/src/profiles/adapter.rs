@@ -52,6 +52,10 @@ pub trait RuntimeAdapter: Sync {
 
     fn render_home(&self, request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult;
 
+    fn existing_home_file_matches(&self, file: &RuntimeHomeFile, existing: &[u8]) -> bool {
+        file.contents == existing
+    }
+
     fn credential_symlink_allowlist(&self) -> Vec<CredentialSymlinkAllowlistEntry> {
         Vec::new()
     }

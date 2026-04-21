@@ -5,7 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::profiles::{
-    CompileProfileBuildRequest, UseProfileRequest, compile_profile_build, use_profile,
+    CompileProfileBuildRequest, ProfileBuildWriteStatus, UseProfileRequest, compile_profile_build,
+    use_profile,
 };
 use agent_matters_core::domain::DiagnosticSeverity;
 use serde_json::{Value, json};
@@ -133,6 +134,35 @@ model = "claude-sonnet-4.5"
     .unwrap();
 
     assert_eq!(settings["model"], "claude-sonnet-4.5");
+}
+
+#[test]
+fn compile_reuses_claude_build_after_runtime_metadata_update() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+    assert_eq!(result.diagnostics, Vec::new());
+    let build = result.build.unwrap();
+    let config_path = build.home_dir.join(".claude.json");
+    let mut config: Value =
+        serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+    config["firstStartTime"] = json!("2026-04-21T00:00:00.000Z");
+    config["migrationVersion"] = json!(11);
+    config["userID"] = json!("claude-runtime-owned");
+    fs::write(
+        &config_path,
+        format!("{}\n", serde_json::to_string_pretty(&config).unwrap()),
+    )
+    .unwrap();
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert_eq!(result.diagnostics, Vec::new());
+    assert_eq!(
+        result.build.unwrap().status,
+        ProfileBuildWriteStatus::Reused
+    );
 }
 
 #[test]
