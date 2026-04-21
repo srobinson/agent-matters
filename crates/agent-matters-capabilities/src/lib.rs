@@ -7,13 +7,14 @@
 //! a thin adapter over these use cases. Later subsystems (a future GUI or
 //! automation layer) would reuse the same capability surface.
 //!
-//! Concrete capabilities (profiles, capabilities, sources, doctor) land in
-//! the sub issues of ALP-1960.
+//! Concrete capabilities land in the sub issues of ALP-1960.
 
 #![forbid(unsafe_code)]
 
+pub mod capabilities;
 pub mod catalog;
 pub mod config;
+pub mod profiles;
 
 /// Crate version exposed for diagnostics and version banners.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

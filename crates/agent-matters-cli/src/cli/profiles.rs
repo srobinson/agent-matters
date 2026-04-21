@@ -1,14 +1,17 @@
 //! `agent-matters profiles` subcommand surface.
 //!
-//! Handler stubs return `not yet implemented` until the relevant use case
-//! ships. Concrete behaviors land in ALP-1942 (list, show), ALP-1937
-//! (compile), and ALP-1943 (use).
+//! Implemented handlers delegate to `agent-matters-capabilities`; remaining
+//! verbs return `not yet implemented` until their issue lands.
 
 use std::path::PathBuf;
 
+use agent_matters_capabilities::profiles::{ListProfilesRequest, list_profiles};
 use clap::Subcommand;
 
-use super::{Runtime, generated_help, help_text};
+use super::{
+    Runtime, default_catalog_paths, emit_diagnostics, generated_help, help_text,
+    render_runtime_names,
+};
 
 /// Verbs for `agent-matters profiles`.
 #[derive(Debug, Subcommand)]
@@ -82,8 +85,31 @@ pub fn dispatch(cmd: ProfilesCmd) -> anyhow::Result<i32> {
     }
 }
 
-fn run_list(_json: bool) -> anyhow::Result<i32> {
-    anyhow::bail!("profiles list: not yet implemented (ALP-1942)")
+fn run_list(json: bool) -> anyhow::Result<i32> {
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let result = list_profiles(ListProfilesRequest {
+        repo_root,
+        user_state_dir,
+    })?;
+    emit_diagnostics(&result.diagnostics);
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result.profiles)?);
+    } else if result.profiles.is_empty() {
+        println!("No profiles found.");
+    } else {
+        for profile in result.profiles {
+            println!(
+                "{}\t{}\t{}\t{}",
+                profile.id,
+                profile.kind,
+                render_runtime_names(&profile.runtimes),
+                profile.source_path
+            );
+        }
+    }
+
+    Ok(0)
 }
 
 fn run_show(_profile: &str, _json: bool) -> anyhow::Result<i32> {

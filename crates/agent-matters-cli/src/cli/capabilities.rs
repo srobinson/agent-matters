@@ -1,12 +1,14 @@
 //! `agent-matters capabilities` subcommand surface.
 //!
-//! Handler stubs return `not yet implemented` until the relevant use case
-//! ships. Concrete behaviors land in ALP-1944 (list, show) and ALP-1929
-//! (diff).
+//! Implemented handlers delegate to `agent-matters-capabilities`; remaining
+//! verbs return `not yet implemented` until their issue lands.
 
+use agent_matters_capabilities::capabilities::{ListCapabilitiesRequest, list_capabilities};
 use clap::Subcommand;
 
-use super::{generated_help, help_text};
+use super::{
+    default_catalog_paths, emit_diagnostics, generated_help, help_text, render_runtime_names,
+};
 
 /// Verbs for `agent-matters capabilities`.
 #[derive(Debug, Subcommand)]
@@ -58,8 +60,31 @@ pub fn dispatch(cmd: CapabilitiesCmd) -> anyhow::Result<i32> {
     }
 }
 
-fn run_list(_json: bool) -> anyhow::Result<i32> {
-    anyhow::bail!("capabilities list: not yet implemented (ALP-1944)")
+fn run_list(json: bool) -> anyhow::Result<i32> {
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let result = list_capabilities(ListCapabilitiesRequest {
+        repo_root,
+        user_state_dir,
+    })?;
+    emit_diagnostics(&result.diagnostics);
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result.capabilities)?);
+    } else if result.capabilities.is_empty() {
+        println!("No capabilities found.");
+    } else {
+        for capability in result.capabilities {
+            println!(
+                "{}\t{}\t{}\t{}",
+                capability.id,
+                capability.kind,
+                render_runtime_names(&capability.runtimes),
+                capability.source_path
+            );
+        }
+    }
+
+    Ok(0)
 }
 
 fn run_show(_capability: &str, _json: bool) -> anyhow::Result<i32> {

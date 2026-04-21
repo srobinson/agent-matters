@@ -11,6 +11,7 @@ description = "Use cases and orchestration for agent-matters runtime profiles"
 agent-matters-core = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 

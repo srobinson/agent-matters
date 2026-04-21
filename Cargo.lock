@@ -9,6 +9,7 @@ dependencies = [
  "agent-matters-core",
  "anyhow",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "toml",
@@ -27,6 +28,8 @@ dependencies = [
  "indexmap",
  "predicates",
  "serde",
+ "serde_json",
+ "tempfile",
  "toml",
 ]
 

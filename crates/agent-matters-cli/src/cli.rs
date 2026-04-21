@@ -11,11 +11,12 @@
 //!     per-command `AFTER_HELP` example blocks.
 //!
 //! Handlers are thin adapters that delegate to `agent-matters-capabilities`.
-//! Until use cases land in their own issues they return a clear `not yet
-//! implemented` error so the CLI surface is discoverable and testable.
+//! Commands without landed use cases return a clear `not yet implemented`
+//! error so the CLI surface is discoverable and testable.
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
+use std::path::PathBuf;
 
 pub mod capabilities;
 pub mod doctor;
@@ -104,6 +105,63 @@ pub fn dispatch(cli: Cli) -> anyhow::Result<i32> {
             clap_complete::generate(shell, &mut cmd, "agent-matters", &mut std::io::stdout());
             Ok(0)
         }
+    }
+}
+
+pub(crate) fn default_catalog_paths() -> anyhow::Result<(PathBuf, PathBuf)> {
+    let repo_root = std::env::current_dir()?;
+    let user_state_dir = match std::env::var_os("AGENT_MATTERS_STATE_DIR") {
+        Some(path) => PathBuf::from(path),
+        None => {
+            let home = std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
+            home.join(".agent-matters")
+        }
+    };
+
+    Ok((repo_root, user_state_dir))
+}
+
+pub(crate) fn render_runtime_names(
+    runtimes: &std::collections::BTreeMap<
+        String,
+        agent_matters_core::catalog::RuntimeCompatibilitySummary,
+    >,
+) -> String {
+    if runtimes.is_empty() {
+        return "none".to_string();
+    }
+
+    runtimes
+        .iter()
+        .map(|(runtime, support)| {
+            if support.supported {
+                runtime.clone()
+            } else {
+                format!("{runtime}:disabled")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn emit_diagnostics(diagnostics: &[agent_matters_core::domain::Diagnostic]) {
+    for diagnostic in diagnostics {
+        eprintln!(
+            "{} {}: {}",
+            diagnostic_severity(diagnostic.severity),
+            diagnostic.code,
+            diagnostic.message
+        );
+    }
+}
+
+fn diagnostic_severity(severity: agent_matters_core::domain::DiagnosticSeverity) -> &'static str {
+    match severity {
+        agent_matters_core::domain::DiagnosticSeverity::Info => "info",
+        agent_matters_core::domain::DiagnosticSeverity::Warning => "warning",
+        agent_matters_core::domain::DiagnosticSeverity::Error => "error",
     }
 }
 

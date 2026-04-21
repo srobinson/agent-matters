@@ -4,11 +4,20 @@
 //! clap error handling for unknown commands, and stub behavior for the
 //! not yet implemented verbs.
 
+use std::path::{Path, PathBuf};
+
 use assert_cmd::Command;
 use predicates::str::contains;
+use tempfile::TempDir;
 
 fn bin() -> Command {
     Command::cargo_bin("agent-matters").expect("cargo bin available in tests")
+}
+
+fn fixture_path(relative: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../agent-matters-capabilities/tests/fixtures")
+        .join(relative)
 }
 
 #[test]
@@ -127,9 +136,37 @@ fn unknown_nested_command_is_clap_error() {
 }
 
 #[test]
-fn not_implemented_verbs_fail_with_clear_message() {
+fn profiles_list_reads_generated_index() {
+    let state = TempDir::new().unwrap();
+
     bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
         .args(["profiles", "list"])
+        .assert()
+        .success()
+        .stdout(contains("github-researcher"));
+
+    assert!(state.path().join("indexes/catalog.json").exists());
+}
+
+#[test]
+fn capabilities_list_reads_generated_index_as_json() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["capabilities", "list", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"skill:playwright\""));
+}
+
+#[test]
+fn remaining_not_implemented_verbs_fail_with_clear_message() {
+    bin()
+        .args(["profiles", "show", "github-researcher"])
         .assert()
         .failure()
         .code(1)
