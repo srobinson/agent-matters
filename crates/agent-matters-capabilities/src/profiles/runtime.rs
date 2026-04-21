@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use agent_matters_core::catalog::{CapabilityIndexRecord, ProfileIndexRecord};
-use agent_matters_core::config::{REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, RuntimeSettings};
+use agent_matters_core::config::{
+    REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, RuntimeSettings, USER_CONFIG_FILE_NAME,
+};
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use serde::Serialize;
 
@@ -54,6 +56,7 @@ pub(crate) fn resolve_runtime_configs(
         Err(error) => diagnostics.push(config_load_error("repo runtime defaults", &error)),
     }
 
+    let user_config_path = user_state_dir.join(USER_CONFIG_FILE_NAME);
     let user_config = match load_user_config_from_state_dir(user_state_dir) {
         Ok(config) => config,
         Err(error) => {
@@ -66,7 +69,7 @@ pub(crate) fn resolve_runtime_configs(
         user_config.runtimes,
         &known,
         &mut diagnostics,
-        user_state_dir.join("config.toml"),
+        user_config_path.clone(),
     );
 
     for capability in effective_capabilities {
@@ -102,6 +105,7 @@ pub(crate) fn resolve_runtime_configs(
         &runtime_configs,
         &mut diagnostics,
         profile_manifest_path,
+        &user_config_path,
     );
 
     RuntimeResolution {
@@ -182,6 +186,7 @@ fn select_default_runtime(
     configs: &[ResolvedRuntimeConfig],
     diagnostics: &mut Vec<Diagnostic>,
     profile_manifest_path: &Path,
+    user_config_path: &Path,
 ) -> Option<String> {
     let available = configs
         .iter()
@@ -196,6 +201,7 @@ fn select_default_runtime(
                 default,
                 "profile",
                 profile_manifest_path,
+                "runtimes.default",
             ));
             None
         };
@@ -214,6 +220,15 @@ fn select_default_runtime(
         }
         [runtime] => Some((*runtime).to_string()),
         _ => {
+            if let Some(default) = user_default {
+                diagnostics.push(default_runtime_unavailable(
+                    default,
+                    "user",
+                    user_config_path,
+                    "default_runtime",
+                ));
+                return None;
+            }
             diagnostics.push(ambiguous_runtime(&available, profile_manifest_path));
             None
         }
@@ -280,17 +295,15 @@ fn unknown_profile_runtime(runtime: &str, profile_manifest_path: &Path) -> Diagn
 fn default_runtime_unavailable(
     runtime: &str,
     source: &str,
-    profile_manifest_path: &Path,
+    path: &Path,
+    field: &str,
 ) -> Diagnostic {
     Diagnostic::new(
         DiagnosticSeverity::Error,
         "profile.runtime.default-unavailable",
         format!("{source} default runtime `{runtime}` is not enabled for this profile"),
     )
-    .with_location(DiagnosticLocation::manifest_field(
-        profile_manifest_path,
-        "runtimes.default",
-    ))
+    .with_location(DiagnosticLocation::manifest_field(path, field))
     .with_recovery_hint("enable the default runtime in the profile or choose an enabled runtime")
 }
 

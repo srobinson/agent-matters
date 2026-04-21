@@ -164,6 +164,73 @@ enabled = true
 }
 
 #[test]
+fn profile_default_must_be_enabled_for_the_profile() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    set_profile_runtimes(
+        repo.path(),
+        r#"[runtimes]
+default = "claude"
+
+[runtimes.codex]
+enabled = true
+"#,
+    );
+
+    let result = resolve(repo.path(), state.path());
+
+    assert_eq!(result.selected_runtime, None);
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "profile.runtime.default-unavailable")
+        .expect("default unavailable diagnostic");
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert!(diagnostic.message.contains("profile default runtime"));
+    assert_eq!(
+        diagnostic
+            .location
+            .as_ref()
+            .and_then(|location| location.field.as_deref()),
+        Some("runtimes.default")
+    );
+}
+
+#[test]
+fn user_default_must_be_enabled_when_profile_runtime_is_ambiguous() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    write(state.path(), "config.toml", r#"default_runtime = "zed""#);
+    set_profile_runtimes(
+        repo.path(),
+        r#"[runtimes.codex]
+enabled = true
+
+[runtimes.claude]
+enabled = true
+"#,
+    );
+
+    let result = resolve(repo.path(), state.path());
+
+    assert_eq!(result.selected_runtime, None);
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "profile.runtime.default-unavailable")
+        .expect("default unavailable diagnostic");
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert!(diagnostic.message.contains("user default runtime"));
+    assert_eq!(
+        diagnostic
+            .location
+            .as_ref()
+            .and_then(|location| location.field.as_deref()),
+        Some("default_runtime")
+    );
+}
+
+#[test]
 fn ambiguous_runtime_without_default_is_error() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
