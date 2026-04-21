@@ -51,7 +51,7 @@ settings that would apply for each registered runtime adapter.
 name = "profile"
 type = "string"
 required = true
-cli_help = "Profile identifier (matches the `name` field in its manifest)"
+cli_help = "Profile identifier (matches the `id` field in its manifest)"
 
 [[tools.profiles-show.params]]
 name = "json"

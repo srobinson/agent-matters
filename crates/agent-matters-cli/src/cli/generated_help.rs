@@ -11,7 +11,7 @@ pub const PROFILES_LIST_JSON_HELP: &str = "Emit machine readable JSON instead of
 #[rustfmt::skip]
 pub const PROFILES_SHOW_ABOUT: &str = "Show a single profile and its resolved capability inventory.\n\nPrints the profile manifest, the ordered list of capabilities it includes, the instruction fragments those capabilities contribute, and the runtime settings that would apply for each registered runtime adapter.";
 #[rustfmt::skip]
-pub const PROFILES_SHOW_PROFILE_HELP: &str = "Profile identifier (matches the `name` field in its manifest)";
+pub const PROFILES_SHOW_PROFILE_HELP: &str = "Profile identifier (matches the `id` field in its manifest)";
 #[rustfmt::skip]
 pub const PROFILES_SHOW_JSON_HELP: &str = "Emit machine readable JSON instead of the human rendering";
 
