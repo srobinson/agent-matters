@@ -6,7 +6,7 @@ pub mod fingerprint;
 
 pub use adapter::{
     CredentialSymlinkAllowlistEntry, RUNTIME_ADAPTER_CONTRACT_VERSION, RuntimeAdapterMetadata,
-    RuntimeHomeFile, RuntimeLaunchInstructions,
+    RuntimeCredentialSymlink, RuntimeHomeFile, RuntimeLaunchInstructions,
 };
 pub use build::{
     BUILD_PLAN_FILE_NAME, BUILD_PLAN_SCHEMA_VERSION, BUILDS_DIR_NAME, RUNTIME_HOME_DIR_NAME,

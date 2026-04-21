@@ -107,6 +107,21 @@ fn compile_writes_codex_runtime_home_contract() {
         fs::read_link(build.home_dir.join("auth.json")).unwrap(),
         state.path().join("native-home/.codex/auth.json")
     );
+    assert!(
+        fs::symlink_metadata(build.home_dir.join("auth.json"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(build.credential_symlinks.len(), 1);
+    assert_eq!(
+        build.credential_symlinks[0].source_path.as_deref(),
+        Some(state.path().join("native-home/.codex/auth.json").as_path())
+    );
+    assert_eq!(
+        build.credential_symlinks[0].target_path,
+        PathBuf::from("auth.json")
+    );
 
     let hooks: Value =
         serde_json::from_str(&fs::read_to_string(build.home_dir.join("hooks.json")).unwrap())
@@ -194,6 +209,35 @@ fn compile_removes_stale_codex_auth_symlink_when_source_is_missing_on_reuse() {
         fs::symlink_metadata(build.home_dir.join("auth.json")),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound
     ));
+}
+
+#[test]
+fn compile_fingerprint_excludes_codex_auth_contents() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let request = compile_request(repo.path(), state.path());
+    let native_home = request.native_home_dir.clone().unwrap();
+    let first = compile_profile_build(request.clone())
+        .unwrap()
+        .build
+        .unwrap();
+
+    fs::write(
+        native_home.join(".codex/auth.json"),
+        br#"{"token":"changed-without-new-build"}"#,
+    )
+    .unwrap();
+    let result = compile_profile_build(request).unwrap();
+
+    assert_eq!(result.diagnostics, Vec::new());
+    let second = result.build.unwrap();
+    assert_eq!(first.fingerprint, second.fingerprint);
+    assert_eq!(first.build_id, second.build_id);
+    assert_eq!(second.status, ProfileBuildWriteStatus::Reused);
+    assert_eq!(
+        fs::read_to_string(second.home_dir.join("auth.json")).unwrap(),
+        r#"{"token":"changed-without-new-build"}"#
+    );
 }
 
 #[test]
@@ -429,6 +473,12 @@ fn compile_json_output_does_not_include_env_values() {
         "env = [\"LINEAR_API_KEY\"]\n",
     );
     let mut request = compile_request(repo.path(), state.path());
+    let native_home = request.native_home_dir.clone().unwrap();
+    fs::write(
+        native_home.join(".codex/auth.json"),
+        br#"{"token":"credential-secret-never-rendered"}"#,
+    )
+    .unwrap();
     request.env = BTreeMap::from([(
         "LINEAR_API_KEY".to_string(),
         "secret-value-never-rendered".to_string(),
@@ -439,8 +489,22 @@ fn compile_json_output_does_not_include_env_values() {
 
     assert_eq!(encoded["profile"], "github-researcher");
     assert_eq!(encoded["build"]["runtime"], "codex");
+    assert_eq!(
+        encoded["build"]["credential_symlinks"][0]["target_path"],
+        "auth.json"
+    );
+    assert!(
+        encoded["build"]["credential_symlinks"][0]["source_path"]
+            .as_str()
+            .is_some()
+    );
     assert_eq!(encoded["diagnostics"], Value::Array(Vec::new()));
     assert!(!encoded.to_string().contains("secret-value-never-rendered"));
+    assert!(
+        !encoded
+            .to_string()
+            .contains("credential-secret-never-rendered")
+    );
 }
 
 fn append_requires(repo: &Path, manifest: &str, body: &str) {

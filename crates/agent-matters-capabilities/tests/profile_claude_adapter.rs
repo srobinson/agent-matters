@@ -98,6 +98,26 @@ fn compile_writes_claude_runtime_home_contract() {
         fs::read_link(build.home_dir.join(".credentials.json")).unwrap(),
         state.path().join("native-home/.claude/.credentials.json")
     );
+    assert!(
+        fs::symlink_metadata(build.home_dir.join(".credentials.json"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(build.credential_symlinks.len(), 1);
+    assert_eq!(
+        build.credential_symlinks[0].source_path.as_deref(),
+        Some(
+            state
+                .path()
+                .join("native-home/.claude/.credentials.json")
+                .as_path()
+        )
+    );
+    assert_eq!(
+        build.credential_symlinks[0].target_path,
+        PathBuf::from(".credentials.json")
+    );
 
     let config: Value =
         serde_json::from_str(&fs::read_to_string(build.home_dir.join(".claude.json")).unwrap())

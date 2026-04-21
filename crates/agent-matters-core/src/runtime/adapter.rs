@@ -47,6 +47,23 @@ impl CredentialSymlinkAllowlistEntry {
     }
 }
 
+/// Machine local credential symlink material for a generated runtime home.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeCredentialSymlink {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<PathBuf>,
+    pub target_path: PathBuf,
+}
+
+impl RuntimeCredentialSymlink {
+    pub fn new(source_path: Option<PathBuf>, target_path: impl AsRef<Path>) -> Self {
+        Self {
+            source_path,
+            target_path: target_path.as_ref().to_path_buf(),
+        }
+    }
+}
+
 /// Runtime neutral manual launch instructions for human and JSON output.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeLaunchInstructions {

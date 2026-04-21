@@ -6,8 +6,8 @@ use std::path::{Component, Path, PathBuf};
 
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use agent_matters_core::runtime::{
-    BUILD_PLAN_FILE_NAME, RUNTIME_HOME_DIR_NAME, RuntimeHomeFile, runtime_build_plan_file,
-    runtime_pointer_target,
+    BUILD_PLAN_FILE_NAME, RUNTIME_HOME_DIR_NAME, RuntimeCredentialSymlink, RuntimeHomeFile,
+    runtime_build_plan_file, runtime_pointer_target,
 };
 use serde::Serialize;
 
@@ -55,6 +55,7 @@ pub struct WrittenProfileBuild {
     pub runtime_pointer: PathBuf,
     pub pointer_target: PathBuf,
     pub build_plan_path: PathBuf,
+    pub credential_symlinks: Vec<RuntimeCredentialSymlink>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -138,6 +139,7 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
         runtime_pointer: paths.runtime_pointer,
         pointer_target: paths.pointer_target,
         build_plan_path: paths.build_plan_path,
+        credential_symlinks,
     });
     result
 }

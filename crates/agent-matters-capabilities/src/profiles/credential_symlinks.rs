@@ -5,15 +5,11 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
-use agent_matters_core::runtime::CredentialSymlinkAllowlistEntry;
+use agent_matters_core::runtime::{CredentialSymlinkAllowlistEntry, RuntimeCredentialSymlink};
 
 use super::RuntimeAdapter;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CredentialSymlink {
-    source_path: Option<PathBuf>,
-    target_path: PathBuf,
-}
+pub(super) type CredentialSymlink = RuntimeCredentialSymlink;
 
 pub(super) fn credential_symlinks_for_adapter(
     adapter: &'static dyn RuntimeAdapter,
@@ -65,16 +61,10 @@ fn credential_symlink(
     let source_path = source_dir.join(&entry.source_name);
     if !source_path.is_file() {
         diagnostics.push(credential_source_missing(runtime, &source_path));
-        return CredentialSymlink {
-            source_path: None,
-            target_path: entry.target_path.clone(),
-        };
+        return CredentialSymlink::new(None, &entry.target_path);
     }
 
-    CredentialSymlink {
-        source_path: Some(source_path),
-        target_path: entry.target_path.clone(),
-    }
+    CredentialSymlink::new(Some(source_path), &entry.target_path)
 }
 
 fn runtime_home_link_path(home_dir: &Path, relative_path: &Path) -> io::Result<PathBuf> {

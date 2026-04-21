@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use predicates::str::contains;
+use serde_json::Value;
 use tempfile::TempDir;
 
 fn bin() -> Command {
@@ -114,13 +115,24 @@ fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
         .stdout
         .clone();
     let output = String::from_utf8(output).unwrap();
+    let encoded: Value = serde_json::from_str(&output).unwrap();
 
     assert!(output.contains("\"profile\": \"github-researcher\""));
     assert!(output.contains("\"build\""));
     assert!(output.contains("\"runtime\": \"codex\""));
     assert!(output.contains("\"fingerprint\": \"fnv64:"));
     assert!(output.contains("\"runtime_pointer\""));
+    assert_eq!(
+        encoded["build"]["credential_symlinks"][0]["target_path"],
+        "auth.json"
+    );
+    assert!(
+        encoded["build"]["credential_symlinks"][0]["source_path"]
+            .as_str()
+            .is_some()
+    );
     assert!(!output.contains("secret-value-never-rendered"));
+    assert!(!output.contains(r#"{"token":"test"}"#));
 }
 
 #[cfg(unix)]
