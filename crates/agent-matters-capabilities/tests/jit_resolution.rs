@@ -109,6 +109,23 @@ fn clear_local_capability_match_creates_session_cache_profile() {
 }
 
 #[test]
+fn hyphenated_capability_name_selects_local_capability() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+
+    let result = resolve(repo.path(), state.path(), "use session-logger");
+
+    let selected = result.selected.as_ref().unwrap();
+    assert_eq!(selected.kind, "jit-profile");
+    let cache = result.session_cache.as_ref().unwrap();
+    let manifest = fs::read_to_string(&cache.profile_manifest_path).unwrap();
+    assert!(manifest.contains("\"hook:session-logger\""));
+    assert!(result.candidates.iter().any(|candidate| {
+        candidate.id == "hook:session-logger" && candidate.reason.contains("capability name")
+    }));
+}
+
+#[test]
 fn ambiguous_matches_return_candidates_without_writing_session_cache() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();

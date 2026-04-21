@@ -155,7 +155,7 @@ fn score_capability(capability: &CapabilityIndexRecord, query: &Query) -> (u16, 
             format!("task text mentions capability id `{}`", capability.id),
         );
     }
-    if query.tokens.contains(body) || query.text.contains(&body.replace('-', " ")) {
+    if query_mentions_capability_body(query, body) {
         return (45, format!("task text mentions capability name `{body}`"));
     }
     let overlap = token_overlap(&capability.summary, query);
@@ -163,6 +163,12 @@ fn score_capability(capability: &CapabilityIndexRecord, query: &Query) -> (u16, 
         overlap * 8,
         format!("{overlap} task token(s) match the capability summary"),
     )
+}
+
+fn query_mentions_capability_body(query: &Query, body: &str) -> bool {
+    query.tokens.contains(body)
+        || query.text.contains(body)
+        || query.text.contains(&body.replace('-', " "))
 }
 
 fn all_id_tokens_match(id: &str, query: &Query) -> bool {
