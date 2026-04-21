@@ -143,6 +143,7 @@ fn run_compile(profile: &str, runtime: Runtime, json: bool) -> anyhow::Result<i3
     let result = compile_profile_build(CompileProfileBuildRequest {
         repo_root,
         user_state_dir,
+        native_home_dir: native_home_dir(),
         profile: profile.to_string(),
         runtime: Some(runtime.as_str().to_string()),
         env: current_env_presence(),
@@ -168,6 +169,7 @@ fn run_use(
     let result = use_profile(UseProfileRequest {
         repo_root,
         user_state_dir,
+        native_home_dir: native_home_dir(),
         profile: profile.to_string(),
         runtime: runtime.map(|runtime| runtime.as_str().to_string()),
         workspace_path: path.map(Path::to_path_buf),
@@ -186,6 +188,10 @@ fn run_use(
 
 fn current_env_presence() -> BTreeMap<String, String> {
     env_presence_from(std::env::vars_os())
+}
+
+fn native_home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
 }
 
 fn env_presence_from(

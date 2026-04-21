@@ -21,6 +21,7 @@ use super::{
 pub struct UseProfileRequest {
     pub repo_root: PathBuf,
     pub user_state_dir: PathBuf,
+    pub native_home_dir: Option<PathBuf>,
     pub profile: String,
     pub runtime: Option<String>,
     pub workspace_path: Option<PathBuf>,
@@ -106,6 +107,7 @@ pub fn use_profile(request: UseProfileRequest) -> Result<UseProfileResult, Catal
     let write_result = write_profile_build(WriteProfileBuildRequest {
         repo_root: request.repo_root,
         user_state_dir: request.user_state_dir,
+        native_home_dir: request.native_home_dir,
         plan,
     });
     result.diagnostics.extend(write_result.diagnostics);

@@ -19,6 +19,7 @@ use super::{
 pub struct CompileProfileBuildRequest {
     pub repo_root: PathBuf,
     pub user_state_dir: PathBuf,
+    pub native_home_dir: Option<PathBuf>,
     pub profile: String,
     pub runtime: Option<String>,
     pub env: BTreeMap<String, String>,
@@ -85,6 +86,7 @@ pub fn compile_profile_build(
     let write_result = write_profile_build(WriteProfileBuildRequest {
         repo_root: request.repo_root,
         user_state_dir: request.user_state_dir,
+        native_home_dir: request.native_home_dir,
         plan,
     });
     result.diagnostics.extend(write_result.diagnostics);

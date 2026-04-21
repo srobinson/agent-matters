@@ -3,7 +3,9 @@
 mod adapter;
 mod build_plan;
 mod build_writer;
+mod codex_adapter;
 mod compile;
+mod credential_symlinks;
 mod instructions;
 mod list;
 mod requirements;

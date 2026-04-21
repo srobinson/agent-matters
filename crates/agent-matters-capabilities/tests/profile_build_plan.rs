@@ -135,8 +135,8 @@ fn adapter_version_is_read_from_registered_runtime_adapter() {
     let adapter = adapter_for_runtime(&build_plan.runtime).unwrap();
 
     assert_eq!(build_plan.adapter_version, adapter.version());
-    assert_eq!(build_plan.adapter_version, "agent-matters:codex:adapter:v1");
-    assert_eq!(build_plan.fingerprint, "fnv64:cd7453c6604d912f");
+    assert_eq!(build_plan.adapter_version, "agent-matters:codex:adapter:v2");
+    assert_eq!(build_plan.fingerprint, "fnv64:1d9e35a63b67fe88");
 }
 
 #[test]
@@ -216,12 +216,12 @@ fn expected_build_plan_json() -> Value {
         "schema_version": 1,
         "profile": "github-researcher",
         "runtime": "codex",
-        "adapter_version": "agent-matters:codex:adapter:v1",
-        "fingerprint": "fnv64:cd7453c6604d912f",
-        "build_id": "cd7453c6604d912f",
+        "adapter_version": "agent-matters:codex:adapter:v2",
+        "fingerprint": "fnv64:1d9e35a63b67fe88",
+        "build_id": "1d9e35a63b67fe88",
         "paths": {
-            "build_dir": "builds/codex/github-researcher/cd7453c6604d912f",
-            "home_dir": "builds/codex/github-researcher/cd7453c6604d912f/home",
+            "build_dir": "builds/codex/github-researcher/1d9e35a63b67fe88",
+            "home_dir": "builds/codex/github-researcher/1d9e35a63b67fe88/home",
             "runtime_pointer": "runtimes/github-researcher/codex"
         },
         "profile_record": profile_record_json(),

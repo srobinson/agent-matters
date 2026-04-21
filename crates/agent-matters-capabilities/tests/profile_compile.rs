@@ -44,10 +44,18 @@ fn compile_request(repo_root: &Path, state: &Path) -> CompileProfileBuildRequest
     CompileProfileBuildRequest {
         repo_root: repo_root.to_path_buf(),
         user_state_dir: state.to_path_buf(),
+        native_home_dir: Some(native_home_with_codex_auth(state)),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
         env: BTreeMap::new(),
     }
+}
+
+fn native_home_with_codex_auth(root: &Path) -> PathBuf {
+    let home = root.join("native-home");
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    home
 }
 
 fn set_profile_runtimes(repo: &Path, runtimes: &str) {
@@ -77,6 +85,110 @@ fn first_compile_creates_immutable_build_and_runtime_pointer() {
     assert_eq!(encoded["profile"], "github-researcher");
     assert_eq!(encoded["runtime"], "codex");
     assert_eq!(encoded["paths"]["home_dir"], build.plan_home_path());
+}
+
+#[test]
+fn compile_writes_codex_runtime_home_contract() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+
+    let build = compile(repo.path(), state.path()).build.unwrap();
+
+    assert!(build.home_dir.join("AGENTS.md").is_file());
+    assert_eq!(
+        fs::read_to_string(build.home_dir.join("skills/playwright/SKILL.md")).unwrap(),
+        "# Playwright\n\nUse Playwright for browser backed workflow verification.\n"
+    );
+    assert_eq!(
+        fs::read_to_string(build.home_dir.join("hooks/session-logger/hook.sh")).unwrap(),
+        "#!/usr/bin/env bash\nprintf 'session handover requested\\n'\n"
+    );
+    assert_eq!(
+        fs::read_link(build.home_dir.join("auth.json")).unwrap(),
+        state.path().join("native-home/.codex/auth.json")
+    );
+
+    let hooks: Value =
+        serde_json::from_str(&fs::read_to_string(build.home_dir.join("hooks.json")).unwrap())
+            .unwrap();
+    assert_eq!(hooks["hooks"][0]["id"], "hook:session-logger");
+    assert_eq!(hooks["hooks"][0]["path"], "hooks/session-logger/hook.sh");
+
+    let config: toml::Value =
+        toml::from_str(&fs::read_to_string(build.home_dir.join("config.toml")).unwrap()).unwrap();
+    assert_eq!(
+        config["mcp_servers"]["linear"]["command"].as_str(),
+        Some("linear-mcp")
+    );
+}
+
+#[test]
+fn compile_writes_codex_model_config() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    set_profile_runtimes(
+        repo.path(),
+        r#"[runtimes.codex]
+enabled = true
+model = "gpt-5.4"
+"#,
+    );
+
+    let build = compile(repo.path(), state.path()).build.unwrap();
+
+    assert_eq!(
+        fs::read_to_string(build.home_dir.join("config.toml")).unwrap(),
+        "model = \"gpt-5.4\"\n\n[mcp_servers.linear]\ncommand = \"linear-mcp\"\n\n[mcp_servers.linear.env]\nLINEAR_API_KEY = \"required\"\n"
+    );
+}
+
+#[test]
+fn compile_warns_when_codex_auth_source_is_missing() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let request = compile_request(repo.path(), state.path());
+    let native_home = request.native_home_dir.as_ref().unwrap();
+    fs::remove_file(native_home.join(".codex/auth.json")).unwrap();
+
+    let result = compile_profile_build(request).unwrap();
+
+    assert!(result.build.is_some());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Warning);
+    assert_eq!(
+        result.diagnostics[0].code,
+        "runtime.credential-source-missing"
+    );
+    assert!(!result.build.unwrap().home_dir.join("auth.json").exists());
+}
+
+#[test]
+fn compile_reports_unsupported_codex_file_mapping() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    fs::write(
+        repo.path()
+            .join("catalog/skills/renamed-skill-dir/README.md"),
+        "extra\n",
+    )
+    .unwrap();
+    let manifest = repo
+        .path()
+        .join("catalog/skills/renamed-skill-dir/manifest.toml");
+    let updated = fs::read_to_string(&manifest).unwrap().replace(
+        "[files]\nsource = \"SKILL.md\"",
+        "[files]\nsource = \"SKILL.md\"\nreadme = \"README.md\"",
+    );
+    fs::write(manifest, updated).unwrap();
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert!(result.build.is_none());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(
+        result.diagnostics[0].code,
+        "runtime.codex.file-mapping-unsupported"
+    );
 }
 
 #[test]
@@ -156,6 +268,7 @@ fn compile_reports_error_when_state_directory_is_not_writable() {
         runtime: Some("codex".to_string()),
     })
     .unwrap();
+    let native_home = native_home_with_codex_auth(state.path());
 
     let original = fs::metadata(state.path()).unwrap().permissions();
     let mut read_only = original.clone();
@@ -164,6 +277,7 @@ fn compile_reports_error_when_state_directory_is_not_writable() {
     let result = compile_profile_build(CompileProfileBuildRequest {
         repo_root: repo.path().to_path_buf(),
         user_state_dir: state.path().to_path_buf(),
+        native_home_dir: Some(native_home),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
         env: BTreeMap::new(),

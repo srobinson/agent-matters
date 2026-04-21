@@ -14,6 +14,9 @@ use serde::Serialize;
 use super::{
     AssembleProfileInstructionsRequest, ProfileBuildPlan, RuntimeHomeRenderRequest,
     RuntimeHomeRenderResult, adapter_for_runtime, assemble_profile_instructions,
+    credential_symlinks::{
+        CredentialSymlink, credential_symlinks_for_adapter, write_credential_symlinks,
+    },
     unknown_runtime_adapter,
 };
 
@@ -21,6 +24,7 @@ use super::{
 pub struct WriteProfileBuildRequest {
     pub repo_root: PathBuf,
     pub user_state_dir: PathBuf,
+    pub native_home_dir: Option<PathBuf>,
     pub plan: ProfileBuildPlan,
 }
 
@@ -86,7 +90,13 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
             .push(unknown_runtime_adapter(&request.plan.runtime));
         return result;
     };
+    let credential_symlinks = credential_symlinks_for_adapter(
+        adapter,
+        request.native_home_dir.as_deref(),
+        &mut result.diagnostics,
+    );
     let home = adapter.render_home(RuntimeHomeRenderRequest {
+        repo_root: &request.repo_root,
         plan: &request.plan,
         instructions: &instructions,
     });
@@ -95,7 +105,7 @@ pub fn write_profile_build(request: WriteProfileBuildRequest) -> WriteProfileBui
         return result;
     }
 
-    let status = match write_immutable_build(&paths, &request.plan, &home) {
+    let status = match write_immutable_build(&paths, &request.plan, &home, &credential_symlinks) {
         Ok(status) => status,
         Err(source) => {
             result.diagnostics.push(write_diagnostic(
@@ -135,9 +145,11 @@ fn write_immutable_build(
     paths: &AbsoluteBuildPaths,
     plan: &ProfileBuildPlan,
     home: &RuntimeHomeRenderResult,
+    credential_symlinks: &[CredentialSymlink],
 ) -> io::Result<ProfileBuildWriteStatus> {
     if paths.build_dir.exists() {
         validate_existing_build(paths, plan, home)?;
+        write_credential_symlinks(&paths.home_dir, credential_symlinks)?;
         return Ok(ProfileBuildWriteStatus::Reused);
     }
 
@@ -151,6 +163,7 @@ fn write_immutable_build(
     remove_path_if_exists(&temp_dir)?;
     fs::create_dir_all(temp_dir.join(RUNTIME_HOME_DIR_NAME))?;
     write_runtime_home_files(&temp_dir.join(RUNTIME_HOME_DIR_NAME), &home.files)?;
+    write_credential_symlinks(&temp_dir.join(RUNTIME_HOME_DIR_NAME), credential_symlinks)?;
     write_build_plan(&temp_dir.join(BUILD_PLAN_FILE_NAME), plan)?;
 
     match fs::rename(&temp_dir, &paths.build_dir) {
@@ -158,6 +171,7 @@ fn write_immutable_build(
         Err(_source) if paths.build_dir.exists() => {
             remove_path_if_exists(&temp_dir)?;
             validate_existing_build(paths, plan, home)?;
+            write_credential_symlinks(&paths.home_dir, credential_symlinks)?;
             Ok(ProfileBuildWriteStatus::Reused)
         }
         Err(source) => {

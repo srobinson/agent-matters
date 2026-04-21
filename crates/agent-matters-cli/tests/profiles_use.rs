@@ -36,14 +36,23 @@ fn valid_repo() -> TempDir {
     repo
 }
 
+fn native_home_with_codex_auth() -> TempDir {
+    let home = TempDir::new().unwrap();
+    fs::create_dir_all(home.path().join(".codex")).unwrap();
+    fs::write(home.path().join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    home
+}
+
 #[test]
 fn profiles_use_renders_manual_launch_for_explicit_path() {
     let state = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .args([
             "profiles",
             "use",
@@ -77,11 +86,13 @@ fn profiles_use_renders_manual_launch_for_explicit_path() {
 fn profiles_use_defaults_path_to_cwd() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
     let expected = fs::canonicalize(repo.path()).unwrap().display().to_string();
 
     let output = bin()
         .current_dir(repo.path())
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .args(["profiles", "use", "github-researcher", "--runtime", "codex"])
         .assert()
         .success()
@@ -186,10 +197,12 @@ fn profiles_use_json_includes_launch_env_and_args() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
 
     let output = bin()
         .current_dir(repo.path())
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .args([
             "profiles",
             "use",

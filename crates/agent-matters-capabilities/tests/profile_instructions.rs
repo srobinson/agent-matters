@@ -36,6 +36,7 @@ fn compile(repo_root: &Path, state: &Path) -> CompileProfileBuildResult {
     let result = compile_profile_build(CompileProfileBuildRequest {
         repo_root: repo_root.to_path_buf(),
         user_state_dir: state.to_path_buf(),
+        native_home_dir: Some(native_home_with_codex_auth(state)),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
         env: BTreeMap::new(),
@@ -51,6 +52,13 @@ fn write(root: &Path, rel: &str, body: &str) {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, body).unwrap();
+}
+
+fn native_home_with_codex_auth(root: &Path) -> std::path::PathBuf {
+    let home = root.join("native-home");
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    home
 }
 
 fn append_profile_marker(repo: &Path, marker: &str) {
@@ -151,6 +159,7 @@ fn missing_instruction_fragment_file_reports_compile_diagnostic() {
     let result = compile_profile_build(CompileProfileBuildRequest {
         repo_root: repo.path().to_path_buf(),
         user_state_dir: state.path().to_path_buf(),
+        native_home_dir: Some(native_home_with_codex_auth(state.path())),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
         env: BTreeMap::new(),

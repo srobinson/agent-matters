@@ -1,7 +1,7 @@
 //! Runtime adapter contracts and built in adapter registry.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use agent_matters_core::config::RuntimeSettings;
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
@@ -9,6 +9,7 @@ use agent_matters_core::runtime::{
     CredentialSymlinkAllowlistEntry, RuntimeHomeFile, RuntimeLaunchInstructions,
 };
 
+use super::codex_adapter::CodexRuntimeAdapter;
 use super::{AssembledProfileInstructions, ProfileBuildPlan, ResolvedRuntimeConfig};
 
 pub const CODEX_RUNTIME_ID: &str = "codex";
@@ -54,11 +55,17 @@ pub trait RuntimeAdapter: Sync {
         Vec::new()
     }
 
+    fn credential_source_dir(&self, native_home_dir: &Path) -> Option<PathBuf> {
+        let _ = native_home_dir;
+        None
+    }
+
     fn launch_instructions(&self, request: RuntimeLaunchRequest<'_>) -> RuntimeLaunchInstructions;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeHomeRenderRequest<'a> {
+    pub repo_root: &'a Path,
     pub plan: &'a ProfileBuildPlan,
     pub instructions: &'a AssembledProfileInstructions,
 }
@@ -105,36 +112,6 @@ pub fn adapter_for_runtime(runtime: &str) -> Option<&'static dyn RuntimeAdapter>
 }
 
 #[derive(Debug, Clone, Copy)]
-struct CodexRuntimeAdapter;
-
-impl RuntimeAdapter for CodexRuntimeAdapter {
-    fn id(&self) -> &'static str {
-        CODEX_RUNTIME_ID
-    }
-
-    fn version(&self) -> &'static str {
-        "agent-matters:codex:adapter:v1"
-    }
-
-    fn render_home(&self, request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult {
-        let _ = request.plan;
-        RuntimeHomeRenderResult::with_instruction_file(request.instructions)
-    }
-
-    fn launch_instructions(&self, request: RuntimeLaunchRequest<'_>) -> RuntimeLaunchInstructions {
-        launch_instructions(
-            "CODEX_HOME",
-            request.runtime_home,
-            vec![
-                "codex".to_string(),
-                "-C".to_string(),
-                request.workspace_path.to_string(),
-            ],
-        )
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
 struct ClaudeRuntimeAdapter;
 
 impl RuntimeAdapter for ClaudeRuntimeAdapter {
@@ -147,6 +124,7 @@ impl RuntimeAdapter for ClaudeRuntimeAdapter {
     }
 
     fn render_home(&self, request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult {
+        let _ = request.repo_root;
         let _ = request.plan;
         RuntimeHomeRenderResult::with_instruction_file(request.instructions)
     }
@@ -160,7 +138,7 @@ impl RuntimeAdapter for ClaudeRuntimeAdapter {
     }
 }
 
-fn launch_instructions(
+pub(super) fn launch_instructions(
     env_name: &str,
     runtime_home: &Path,
     args: Vec<String>,

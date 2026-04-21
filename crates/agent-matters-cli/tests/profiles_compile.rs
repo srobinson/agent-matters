@@ -43,13 +43,22 @@ fn append_requires(repo: &Path, manifest: &str, body: &str) {
     fs::write(path, updated).unwrap();
 }
 
+fn native_home_with_codex_auth() -> TempDir {
+    let home = TempDir::new().unwrap();
+    fs::create_dir_all(home.path().join(".codex")).unwrap();
+    fs::write(home.path().join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    home
+}
+
 #[test]
 fn profiles_compile_renders_human_summary_and_writes_runtime_pointer() {
     let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .args([
             "profiles",
             "compile",
@@ -79,6 +88,7 @@ fn profiles_compile_renders_human_summary_and_writes_runtime_pointer() {
 fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
     append_requires(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
@@ -88,6 +98,7 @@ fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
     let output = bin()
         .current_dir(repo.path())
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .env("LINEAR_API_KEY", "secret-value-never-rendered")
         .args([
             "profiles",
@@ -119,10 +130,12 @@ fn profiles_compile_tolerates_non_utf8_environment_values() {
     use std::os::unix::ffi::OsStringExt;
 
     let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .env(
             "AGENT_MATTERS_BINARY_VALUE",
             OsString::from_vec(vec![b'o', 0x80, b'k']),
@@ -143,6 +156,7 @@ fn profiles_compile_tolerates_non_utf8_environment_values() {
 fn profiles_compile_human_output_includes_missing_env_warning() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
     append_requires(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
@@ -152,6 +166,7 @@ fn profiles_compile_human_output_includes_missing_env_warning() {
     bin()
         .current_dir(repo.path())
         .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home.path())
         .env_remove("LINEAR_API_KEY")
         .args([
             "profiles",

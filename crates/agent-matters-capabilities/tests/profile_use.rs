@@ -37,11 +37,19 @@ fn use_request(repo: &Path, state: &Path, workspace: &Path) -> UseProfileRequest
     UseProfileRequest {
         repo_root: repo.to_path_buf(),
         user_state_dir: state.to_path_buf(),
+        native_home_dir: Some(native_home_with_codex_auth(state)),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
         workspace_path: Some(workspace.to_path_buf()),
         env: BTreeMap::new(),
     }
+}
+
+fn native_home_with_codex_auth(root: &Path) -> PathBuf {
+    let home = root.join("native-home");
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    home
 }
 
 #[test]
