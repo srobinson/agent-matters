@@ -11,6 +11,7 @@ mod runtime;
 mod scope;
 mod scope_git;
 mod show;
+mod use_profile;
 
 pub use build_plan::{
     BuildPlanContentInput, BuildPlanPaths, BuildProfilePlanRequest, BuildProfilePlanResult,
@@ -27,6 +28,7 @@ pub(crate) use instructions::{
     assemble_profile_instructions, resolve_instruction_output,
 };
 pub use list::{ListProfilesRequest, ListProfilesResult, list_profiles};
+pub(crate) use requirements::validate_resolved_capability_requirements;
 pub use requirements::{
     CapabilityRequirementCheck, EnvRequirementCheck, ProfileRequirementValidationMode,
     ProfileRequirementValidationResult, RequirementPresence, validate_profile_requirements,
@@ -41,3 +43,6 @@ pub use scope::{
     validate_profile_use_scope,
 };
 pub use show::{ShowProfileRequest, ShowProfileResult, show_profile};
+pub use use_profile::{
+    ProfileLaunchInstructions, UseProfileRequest, UseProfileResult, use_profile,
+};

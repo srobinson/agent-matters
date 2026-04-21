@@ -21,6 +21,8 @@ pub const PROFILES_COMPILE_ABOUT: &str = "Compile a runtime home for the given p
 pub const PROFILES_COMPILE_PROFILE_HELP: &str = "Profile identifier to compile";
 #[rustfmt::skip]
 pub const PROFILES_COMPILE_RUNTIME_HELP: &str = "Target runtime for the compiled build";
+#[rustfmt::skip]
+pub const PROFILES_COMPILE_JSON_HELP: &str = "Emit machine readable JSON instead of the human summary";
 
 #[rustfmt::skip]
 pub const PROFILES_USE_ABOUT: &str = "Activate the given profile for the target runtime.\n\nCompiles the profile if needed and points the runtime's managed home (`CODEX_HOME` or `CLAUDE_CONFIG_DIR`) at the resulting build. Does not launch the runtime binary; prints the launch command the caller should run.";
@@ -29,7 +31,9 @@ pub const PROFILES_USE_PROFILE_HELP: &str = "Profile identifier to activate";
 #[rustfmt::skip]
 pub const PROFILES_USE_PATH_HELP: &str = "Directory to activate the profile in. Defaults to the current working directory.";
 #[rustfmt::skip]
-pub const PROFILES_USE_RUNTIME_HELP: &str = "Target runtime for activation";
+pub const PROFILES_USE_RUNTIME_HELP: &str = "Target runtime for activation. Defaults through profile, user config, or single enabled runtime.";
+#[rustfmt::skip]
+pub const PROFILES_USE_JSON_HELP: &str = "Emit machine readable JSON launch instructions";
 
 #[rustfmt::skip]
 pub const CAPABILITIES_LIST_ABOUT: &str = "List capabilities discovered in the local catalog.\n\nEach row includes the capability id, kind, runtime support, provenance state, and summary. Use `capabilities show` to inspect files, requirements, source paths, and overlay metadata.";

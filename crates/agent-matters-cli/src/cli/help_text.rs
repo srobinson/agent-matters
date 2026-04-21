@@ -31,13 +31,13 @@ pub const PROFILES_SHOW_AFTER_HELP: &str =
 pub const PROFILES_COMPILE_AFTER_HELP: &str =
 "Examples:\n  \
   agent-matters profiles compile my-profile --runtime codex\n  \
-  agent-matters profiles compile my-profile --runtime claude";
+  agent-matters profiles compile my-profile --runtime claude --json";
 
 #[rustfmt::skip]
 pub const PROFILES_USE_AFTER_HELP: &str =
 "Examples:\n  \
-  agent-matters profiles use my-profile --runtime codex\n  \
-  agent-matters profiles use my-profile ./some/repo --runtime claude";
+  agent-matters profiles use my-profile\n  \
+  agent-matters profiles use my-profile ./some/repo --runtime claude --json";
 
 #[rustfmt::skip]
 pub const CAPABILITIES_LIST_AFTER_HELP: &str =

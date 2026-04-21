@@ -82,6 +82,12 @@ enum = ["codex", "claude"]
 cli_flag = "runtime"
 cli_help = "Target runtime for the compiled build"
 
+[[tools.profiles-compile.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human summary"
+
 [tools.profiles-use]
 cli_about = """
 Activate the given profile for the target runtime.
@@ -105,10 +111,15 @@ cli_help = "Directory to activate the profile in. Defaults to the current workin
 [[tools.profiles-use.params]]
 name = "runtime"
 type = "string"
-required = true
 enum = ["codex", "claude"]
 cli_flag = "runtime"
-cli_help = "Target runtime for activation"
+cli_help = "Target runtime for activation. Defaults through profile, user config, or single enabled runtime."
+
+[[tools.profiles-use.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON launch instructions"
 
 # ---------------------------------------------------------------------------
 # capabilities

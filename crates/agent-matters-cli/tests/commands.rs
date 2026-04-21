@@ -1,8 +1,8 @@
 //! Noun first command surface integration tests (ALP-1920).
 //!
 //! Asserts the clap tree shape, `--json` availability on inspect commands,
-//! clap error handling for unknown commands, and stub behavior for the
-//! not yet implemented verbs.
+//! clap error handling for unknown commands, and clear behavior for verbs
+//! whose implementation has not landed yet.
 
 use std::path::{Path, PathBuf};
 
@@ -116,8 +116,21 @@ fn profiles_compile_accepts_runtime_value() {
         .assert()
         .success()
         .stdout(contains("--runtime"))
+        .stdout(contains("--json"))
         .stdout(contains("codex"))
         .stdout(contains("claude"));
+}
+
+#[test]
+fn profiles_use_advertises_runtime_and_json_flags() {
+    bin()
+        .args(["profiles", "use", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("--runtime"))
+        .stdout(contains("--json"))
+        .stdout(contains("Defaults through profile"))
+        .stdout(contains("agent-matters profiles use my-profile"));
 }
 
 #[test]
@@ -310,20 +323,7 @@ fn capabilities_diff_reports_overlay_changes() {
 #[test]
 fn remaining_not_implemented_verbs_fail_with_clear_message() {
     bin()
-        .args([
-            "profiles",
-            "compile",
-            "github-researcher",
-            "--runtime",
-            "codex",
-        ])
-        .assert()
-        .failure()
-        .code(1)
-        .stderr(contains("not yet implemented"));
-
-    bin()
-        .args(["profiles", "use", "github-researcher", "--runtime", "codex"])
+        .args(["sources", "import", "skills.sh:playwright"])
         .assert()
         .failure()
         .code(1)

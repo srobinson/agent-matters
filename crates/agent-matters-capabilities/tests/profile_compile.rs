@@ -46,7 +46,15 @@ fn compile_request(repo_root: &Path, state: &Path) -> CompileProfileBuildRequest
         user_state_dir: state.to_path_buf(),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
+        env: BTreeMap::new(),
     }
+}
+
+fn set_profile_runtimes(repo: &Path, runtimes: &str) {
+    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
+    let body = fs::read_to_string(&path).unwrap();
+    let prefix = body.split("[runtimes.codex]").next().unwrap();
+    fs::write(path, format!("{prefix}{runtimes}")).unwrap();
 }
 
 #[test]
@@ -158,6 +166,7 @@ fn compile_reports_error_when_state_directory_is_not_writable() {
         user_state_dir: state.path().to_path_buf(),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
+        env: BTreeMap::new(),
     })
     .unwrap();
     fs::set_permissions(state.path(), original).unwrap();
@@ -177,6 +186,121 @@ fn compile_does_not_mutate_authored_catalog_files() {
     let _ = compile(repo.path(), state.path());
 
     assert_eq!(file_snapshot(repo.path()), before);
+}
+
+#[test]
+fn compile_warns_on_missing_required_env_and_still_writes_build() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    append_requires(
+        repo.path(),
+        "catalog/mcp/linear/manifest.toml",
+        "env = [\"LINEAR_API_KEY\"]\n",
+    );
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert!(result.build.is_some());
+    assert!(!result.has_error_diagnostics());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Warning);
+    assert_eq!(result.diagnostics[0].code, "profile.required-env-missing");
+}
+
+#[test]
+fn compile_fails_on_missing_required_capability() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    append_requires(
+        repo.path(),
+        "catalog/mcp/linear/manifest.toml",
+        "capabilities = [\"mcp:context-matters\"]\n",
+    );
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert!(result.build.is_none());
+    assert!(result.has_error_diagnostics());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(
+        result.diagnostics[0].code,
+        "profile.required-capability-missing"
+    );
+}
+
+#[test]
+fn compile_fails_on_runtime_not_enabled_for_profile() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let mut request = compile_request(repo.path(), state.path());
+    request.runtime = Some("claude".to_string());
+
+    let result = compile_profile_build(request).unwrap();
+
+    assert!(result.build.is_none());
+    assert!(result.has_error_diagnostics());
+    assert_eq!(
+        result.diagnostics[0].code,
+        "profile.build-plan.runtime-unavailable"
+    );
+}
+
+#[test]
+fn compile_fails_when_capability_does_not_support_requested_runtime() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    set_profile_runtimes(
+        repo.path(),
+        r#"[runtimes.codex]
+enabled = true
+
+[runtimes.claude]
+enabled = true
+"#,
+    );
+    let mut request = compile_request(repo.path(), state.path());
+    request.runtime = Some("claude".to_string());
+
+    let result = compile_profile_build(request).unwrap();
+
+    assert!(result.build.is_none());
+    assert!(result.has_error_diagnostics());
+    assert_eq!(
+        result.diagnostics[0].code,
+        "profile.runtime.capability-unsupported"
+    );
+}
+
+#[test]
+fn compile_json_output_does_not_include_env_values() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    append_requires(
+        repo.path(),
+        "catalog/mcp/linear/manifest.toml",
+        "env = [\"LINEAR_API_KEY\"]\n",
+    );
+    let mut request = compile_request(repo.path(), state.path());
+    request.env = BTreeMap::from([(
+        "LINEAR_API_KEY".to_string(),
+        "secret-value-never-rendered".to_string(),
+    )]);
+
+    let result = compile_profile_build(request).unwrap();
+    let encoded = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(encoded["profile"], "github-researcher");
+    assert_eq!(encoded["build"]["runtime"], "codex");
+    assert_eq!(encoded["diagnostics"], Value::Array(Vec::new()));
+    assert!(!encoded.to_string().contains("secret-value-never-rendered"));
+}
+
+fn append_requires(repo: &Path, manifest: &str, body: &str) {
+    let path = repo.join(manifest);
+    let mut updated = fs::read_to_string(&path).unwrap();
+    updated.push_str("\n[requires]\n");
+    updated.push_str(body);
+    fs::write(path, updated).unwrap();
 }
 
 fn file_snapshot(root: &Path) -> BTreeMap<String, Vec<u8>> {

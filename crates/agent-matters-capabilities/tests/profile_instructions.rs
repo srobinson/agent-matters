@@ -1,5 +1,6 @@
 mod support;
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -37,6 +38,7 @@ fn compile(repo_root: &Path, state: &Path) -> CompileProfileBuildResult {
         user_state_dir: state.to_path_buf(),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
+        env: BTreeMap::new(),
     })
     .unwrap();
     assert_eq!(result.diagnostics, Vec::new());
@@ -151,6 +153,7 @@ fn missing_instruction_fragment_file_reports_compile_diagnostic() {
         user_state_dir: state.path().to_path_buf(),
         profile: "github-researcher".to_string(),
         runtime: Some("codex".to_string()),
+        env: BTreeMap::new(),
     })
     .unwrap();
 

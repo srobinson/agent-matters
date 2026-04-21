@@ -85,6 +85,15 @@ pub enum Runtime {
     Claude,
 }
 
+impl Runtime {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Claude => "claude",
+        }
+    }
+}
+
 /// Parse the top level CLI and dispatch to the appropriate handler.
 ///
 /// Returns the intended process exit code. A bare invocation with no

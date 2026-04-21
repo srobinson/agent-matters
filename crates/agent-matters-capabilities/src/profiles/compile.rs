@@ -1,14 +1,17 @@
 //! Compile profiles into managed runtime homes.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
+use agent_matters_core::catalog::{CapabilityIndexRecord, MANIFEST_FILE_NAME};
+use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use serde::Serialize;
 
 use crate::catalog::CatalogIndexError;
 
 use super::{
-    BuildProfilePlanRequest, WriteProfileBuildRequest, WrittenProfileBuild, plan_profile_build,
+    BuildProfilePlanRequest, ProfileRequirementValidationMode, WriteProfileBuildRequest,
+    WrittenProfileBuild, plan_profile_build, validate_resolved_capability_requirements,
     write_profile_build,
 };
 
@@ -18,6 +21,7 @@ pub struct CompileProfileBuildRequest {
     pub user_state_dir: PathBuf,
     pub profile: String,
     pub runtime: Option<String>,
+    pub env: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -60,6 +64,24 @@ pub fn compile_profile_build(
         return Ok(result);
     };
 
+    result.diagnostics.extend(validate_runtime_compatibility(
+        &plan.runtime,
+        &plan.effective_capabilities,
+    ));
+    if result.has_error_diagnostics() {
+        return Ok(result);
+    }
+
+    let requirement_result = validate_resolved_capability_requirements(
+        &plan.effective_capabilities,
+        &request.env,
+        ProfileRequirementValidationMode::Compile,
+    );
+    result.diagnostics.extend(requirement_result.diagnostics);
+    if result.has_error_diagnostics() {
+        return Ok(result);
+    }
+
     let write_result = write_profile_build(WriteProfileBuildRequest {
         repo_root: request.repo_root,
         user_state_dir: request.user_state_dir,
@@ -68,4 +90,38 @@ pub fn compile_profile_build(
     result.diagnostics.extend(write_result.diagnostics);
     result.build = write_result.build;
     Ok(result)
+}
+
+pub(super) fn validate_runtime_compatibility(
+    runtime: &str,
+    capabilities: &[CapabilityIndexRecord],
+) -> Vec<Diagnostic> {
+    capabilities
+        .iter()
+        .filter(|record| !capability_supports_runtime(record, runtime))
+        .map(|record| unsupported_capability_runtime(record, runtime))
+        .collect()
+}
+
+fn capability_supports_runtime(record: &CapabilityIndexRecord, runtime: &str) -> bool {
+    record
+        .runtimes
+        .get(runtime)
+        .is_some_and(|support| support.supported)
+}
+
+fn unsupported_capability_runtime(record: &CapabilityIndexRecord, runtime: &str) -> Diagnostic {
+    Diagnostic::new(
+        DiagnosticSeverity::Error,
+        "profile.runtime.capability-unsupported",
+        format!(
+            "capability `{}` does not support runtime `{runtime}`",
+            record.id
+        ),
+    )
+    .with_location(DiagnosticLocation::manifest_field(
+        PathBuf::from(&record.source_path).join(MANIFEST_FILE_NAME),
+        format!("runtimes.{runtime}"),
+    ))
+    .with_recovery_hint("remove the capability or choose a runtime it supports")
 }

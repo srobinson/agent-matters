@@ -59,8 +59,15 @@ pub fn validate_profile_requirements(
     env: &BTreeMap<String, String>,
     mode: ProfileRequirementValidationMode,
 ) -> ProfileRequirementValidationResult {
-    let included_capabilities = resolved
-        .effective_capabilities
+    validate_resolved_capability_requirements(&resolved.effective_capabilities, env, mode)
+}
+
+pub(crate) fn validate_resolved_capability_requirements(
+    effective_capabilities: &[CapabilityIndexRecord],
+    env: &BTreeMap<String, String>,
+    mode: ProfileRequirementValidationMode,
+) -> ProfileRequirementValidationResult {
+    let included_capabilities = effective_capabilities
         .iter()
         .map(|record| record.id.as_str())
         .collect::<BTreeSet<_>>();
@@ -70,7 +77,7 @@ pub fn validate_profile_requirements(
         diagnostics: Vec::new(),
     };
 
-    for record in &resolved.effective_capabilities {
+    for record in effective_capabilities {
         validate_capability_dependencies(record, &included_capabilities, &mut result);
         validate_env_requirements(record, env, mode, &mut result);
     }

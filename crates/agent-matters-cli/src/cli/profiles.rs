@@ -3,14 +3,19 @@
 //! Implemented handlers delegate to `agent-matters-capabilities`; remaining
 //! verbs return `not yet implemented` until their issue lands.
 
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::profiles::{
-    ListProfilesRequest, ShowProfileRequest, list_profiles, show_profile,
+    CompileProfileBuildRequest, ListProfilesRequest, ShowProfileRequest, UseProfileRequest,
+    compile_profile_build, list_profiles, show_profile, use_profile,
 };
 use clap::Subcommand;
 
-use super::profile_render::{render_profile_list, render_profile_show};
+use super::profile_render::{
+    render_profile_compile, render_profile_list, render_profile_show, render_profile_use,
+};
 use super::{Runtime, default_catalog_paths, emit_diagnostics, generated_help, help_text};
 
 /// Verbs for `agent-matters profiles`.
@@ -51,6 +56,9 @@ pub enum ProfilesCmd {
         /// Target runtime.
         #[arg(long, value_enum, help = generated_help::PROFILES_COMPILE_RUNTIME_HELP)]
         runtime: Runtime,
+        /// Emit JSON instead of human readable output.
+        #[arg(short = 'j', long, help = generated_help::PROFILES_COMPILE_JSON_HELP)]
+        json: bool,
     },
     /// Activate the given profile for the target runtime.
     #[command(
@@ -67,7 +75,10 @@ pub enum ProfilesCmd {
         path: Option<PathBuf>,
         /// Target runtime.
         #[arg(long, value_enum, help = generated_help::PROFILES_USE_RUNTIME_HELP)]
-        runtime: Runtime,
+        runtime: Option<Runtime>,
+        /// Emit JSON instead of human readable output.
+        #[arg(short = 'j', long, help = generated_help::PROFILES_USE_JSON_HELP)]
+        json: bool,
     },
 }
 
@@ -76,12 +87,17 @@ pub fn dispatch(cmd: ProfilesCmd) -> anyhow::Result<i32> {
     match cmd {
         ProfilesCmd::List { json } => run_list(json),
         ProfilesCmd::Show { profile, json } => run_show(&profile, json),
-        ProfilesCmd::Compile { profile, runtime } => run_compile(&profile, runtime),
+        ProfilesCmd::Compile {
+            profile,
+            runtime,
+            json,
+        } => run_compile(&profile, runtime, json),
         ProfilesCmd::Use {
             profile,
             path,
             runtime,
-        } => run_use(&profile, path.as_deref(), runtime),
+            json,
+        } => run_use(&profile, path.as_deref(), runtime, json),
     }
 }
 
@@ -122,14 +138,60 @@ fn run_show(profile: &str, json: bool) -> anyhow::Result<i32> {
     Ok(if result.has_error_diagnostics() { 1 } else { 0 })
 }
 
-fn run_compile(_profile: &str, _runtime: Runtime) -> anyhow::Result<i32> {
-    anyhow::bail!("profiles compile: not yet implemented (ALP-1937)")
+fn run_compile(profile: &str, runtime: Runtime, json: bool) -> anyhow::Result<i32> {
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let result = compile_profile_build(CompileProfileBuildRequest {
+        repo_root,
+        user_state_dir,
+        profile: profile.to_string(),
+        runtime: Some(runtime.as_str().to_string()),
+        env: current_env_presence(),
+    })?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        emit_diagnostics(&result.diagnostics);
+        render_profile_compile(&result);
+    }
+
+    Ok(if result.has_error_diagnostics() { 1 } else { 0 })
 }
 
 fn run_use(
-    _profile: &str,
-    _path: Option<&std::path::Path>,
-    _runtime: Runtime,
+    profile: &str,
+    path: Option<&Path>,
+    runtime: Option<Runtime>,
+    json: bool,
 ) -> anyhow::Result<i32> {
-    anyhow::bail!("profiles use: not yet implemented (ALP-1943)")
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let result = use_profile(UseProfileRequest {
+        repo_root,
+        user_state_dir,
+        profile: profile.to_string(),
+        runtime: runtime.map(|runtime| runtime.as_str().to_string()),
+        workspace_path: path.map(Path::to_path_buf),
+        env: current_env_presence(),
+    })?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        emit_diagnostics(&result.diagnostics);
+        render_profile_use(&result);
+    }
+
+    Ok(if result.has_error_diagnostics() { 1 } else { 0 })
+}
+
+fn current_env_presence() -> BTreeMap<String, String> {
+    env_presence_from(std::env::vars_os())
+}
+
+fn env_presence_from(
+    vars: impl IntoIterator<Item = (OsString, OsString)>,
+) -> BTreeMap<String, String> {
+    vars.into_iter()
+        .filter_map(|(name, _value)| name.into_string().ok().map(|name| (name, String::new())))
+        .collect()
 }

@@ -2,8 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use agent_matters_capabilities::profiles::ShowProfileResult;
+use agent_matters_capabilities::profiles::{
+    CompileProfileBuildResult, ProfileBuildWriteStatus, ShowProfileResult, UseProfileResult,
+};
 use agent_matters_core::catalog::{ProfileIndexRecord, RuntimeCompatibilitySummary};
+use agent_matters_core::domain::DiagnosticSeverity;
 
 pub(crate) fn render_profile_list(profiles: Vec<ProfileIndexRecord>) {
     for profile in profiles {
@@ -34,6 +37,83 @@ pub(crate) fn render_profile_show(result: &ShowProfileResult) {
     render_runtime_configs(result);
     render_capabilities(result);
     render_instruction_fragments(result);
+}
+
+pub(crate) fn render_profile_compile(result: &CompileProfileBuildResult) {
+    println!("Profile: {}", result.profile);
+    let Some(build) = &result.build else {
+        return;
+    };
+
+    println!("Runtime: {}", build.runtime);
+    println!("Fingerprint: {}", build.fingerprint);
+    println!("Build status: {}", render_build_status(build.status));
+    println!("Immutable build path: {}", build.build_dir.display());
+    println!("Stable runtime path: {}", build.runtime_pointer.display());
+
+    let warnings = result
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Warning)
+        .collect::<Vec<_>>();
+
+    println!();
+    println!("Warnings:");
+    if warnings.is_empty() {
+        println!("none");
+    } else {
+        for diagnostic in warnings {
+            println!("{}\t{}", diagnostic.code, diagnostic.message);
+        }
+    }
+}
+
+pub(crate) fn render_profile_use(result: &UseProfileResult) {
+    println!("Profile: {}", result.profile);
+    if let Some(build) = &result.build {
+        println!("Runtime: {}", build.runtime);
+        println!("Fingerprint: {}", build.fingerprint);
+        println!("Runtime home: {}", build.runtime_pointer.display());
+    }
+
+    if let Some(launch) = &result.launch {
+        println!();
+        println!("Launch environment:");
+        for (name, value) in &launch.env {
+            println!("{name}={value}");
+        }
+        println!();
+        println!("Manual launch:");
+        println!("{}", launch.command);
+    }
+
+    render_diagnostic_group("Blockers", result, DiagnosticSeverity::Error);
+    render_diagnostic_group("Warnings", result, DiagnosticSeverity::Warning);
+}
+
+fn render_diagnostic_group(label: &str, result: &UseProfileResult, severity: DiagnosticSeverity) {
+    let diagnostics = result
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == severity)
+        .collect::<Vec<_>>();
+
+    println!();
+    println!("{label}:");
+    if diagnostics.is_empty() {
+        println!("none");
+    } else {
+        for diagnostic in diagnostics {
+            println!("{}\t{}", diagnostic.code, diagnostic.message);
+        }
+    }
+}
+
+fn render_build_status(status: ProfileBuildWriteStatus) -> &'static str {
+    match status {
+        ProfileBuildWriteStatus::Created => "created",
+        ProfileBuildWriteStatus::Reused => "reused",
+    }
 }
 
 fn render_scope(record: &ProfileIndexRecord) {
