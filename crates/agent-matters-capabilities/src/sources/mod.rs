@@ -6,6 +6,7 @@
 
 mod contract;
 mod import;
+pub mod mcp_registry_spec;
 mod search;
 mod skills_sh;
 mod skills_sh_parse;

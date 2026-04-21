@@ -62,7 +62,9 @@ impl ImportSourceError {
                 "source.locator-invalid",
                 format!("source locator `{locator}` must use `<source>:<locator>`"),
             )
-            .with_recovery_hint("try `skills.sh:owner/repo@skill-name`"),
+            .with_recovery_hint(
+                "try `<source>:<locator>`, for example `skills.sh:owner/repo@skill-name`",
+            ),
             Self::Adapter(source) => source.to_diagnostic(),
             Self::Storage(SourceImportStorageError::AlreadyExists { path }) => Diagnostic::new(
                 DiagnosticSeverity::Error,
