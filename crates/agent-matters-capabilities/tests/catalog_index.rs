@@ -68,6 +68,7 @@ fn exact_lookup_by_capability_id_and_profile_id() {
 
     let capability = loaded.index.capability("skill:playwright").unwrap();
     assert_eq!(capability.kind, "skill");
+    assert_eq!(capability.source.kind, "local");
     assert!(capability.runtimes["codex"].supported);
     assert_eq!(
         capability.requirements,
@@ -78,6 +79,36 @@ fn exact_lookup_by_capability_id_and_profile_id() {
     assert_eq!(profile.kind, "persona");
     assert_eq!(profile.capability_count, 4);
     assert_eq!(profile.instruction_count, 2);
+}
+
+#[test]
+fn effective_capability_index_prefers_overlay_over_normalized_import() {
+    let repo_root = fixture_path("catalogs/imported-overlaid");
+    let state = TempDir::new().unwrap();
+
+    let loaded = load_or_refresh_catalog_index(LoadCatalogIndexRequest {
+        repo_root,
+        user_state_dir: state.path().to_path_buf(),
+    })
+    .unwrap();
+
+    let capability = loaded.index.capability("skill:playwright").unwrap();
+    assert_eq!(capability.summary, "Local Playwright skill overlay.");
+    assert_eq!(capability.source_path, "overlays/skills/playwright");
+    assert_eq!(capability.source.kind, "overlaid");
+    assert_eq!(
+        capability.source.normalized_path.as_deref(),
+        Some("catalog/skills/playwright")
+    );
+    assert_eq!(
+        capability.source.overlay_path.as_deref(),
+        Some("overlays/skills/playwright")
+    );
+    assert_eq!(
+        capability.source.vendor_path.as_deref(),
+        Some("vendor/skills.sh/playwright")
+    );
+    assert!(capability.runtimes["claude"].supported);
 }
 
 #[test]

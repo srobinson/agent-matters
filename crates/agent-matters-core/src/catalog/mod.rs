@@ -8,9 +8,9 @@ pub mod index;
 pub mod paths;
 
 pub use index::{
-    CATALOG_INDEX_FILE_NAME, CATALOG_INDEX_SCHEMA_VERSION, CapabilityIndexRecord, CatalogIndex,
-    INDEXES_DIR_NAME, ProfileIndexRecord, ProvenanceSummary, RequirementSummary,
-    RuntimeCompatibilitySummary,
+    CATALOG_INDEX_FILE_NAME, CATALOG_INDEX_SCHEMA_VERSION, CapabilityIndexRecord,
+    CapabilitySourceSummary, CatalogIndex, INDEXES_DIR_NAME, ProfileIndexRecord, ProvenanceSummary,
+    RequirementSummary, RuntimeCompatibilitySummary,
 };
 pub use paths::{
     CAPABILITY_AGENTS_DIR_NAME, CAPABILITY_HOOKS_DIR_NAME, CAPABILITY_INSTRUCTIONS_DIR_NAME,

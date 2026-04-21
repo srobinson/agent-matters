@@ -2,10 +2,11 @@
 
 mod discovery;
 mod index;
+mod overlays;
 
 pub use discovery::{
-    CatalogDiscovery, DiscoveredCapabilityManifest, DiscoveredManifest, DiscoveredProfileManifest,
-    discover_catalog,
+    CapabilityDiscoverySource, CatalogDiscovery, DiscoveredCapabilityManifest, DiscoveredManifest,
+    DiscoveredProfileManifest, discover_catalog,
 };
 pub use index::{
     CatalogIndexError, CatalogIndexStatus, LoadCatalogIndexRequest, LoadCatalogIndexResult,

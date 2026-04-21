@@ -1,6 +1,6 @@
 mod support;
 
-use agent_matters_capabilities::catalog::discover_catalog;
+use agent_matters_capabilities::catalog::{CapabilityDiscoverySource, discover_catalog};
 use agent_matters_core::domain::{CapabilityKind, Diagnostic, DiagnosticSeverity};
 
 use support::fixture_path;
@@ -133,4 +133,94 @@ fn generated_agent_matters_state_is_not_source_discovery() {
     assert_eq!(discovery.capabilities.len(), 0);
     assert_eq!(discovery.profiles.len(), 0);
     assert_eq!(discovery.diagnostics, Vec::new());
+}
+
+#[test]
+fn imported_capability_without_overlay_preserves_vendor_pointer() {
+    let root = fixture_path("catalogs/imported");
+    let discovery = discover_catalog(&root);
+
+    assert_eq!(discovery.diagnostics, Vec::new());
+    let capability = discovery
+        .capabilities
+        .iter()
+        .find(|entry| entry.manifest.id.to_string() == "skill:playwright")
+        .expect("imported capability discovered");
+
+    match &capability.source {
+        CapabilityDiscoverySource::Imported { vendor_path } => assert!(
+            vendor_path
+                .as_ref()
+                .expect("vendor pointer")
+                .ends_with("vendor/skills.sh/playwright")
+        ),
+        other => panic!("expected imported source, got {other:?}"),
+    }
+}
+
+#[test]
+fn imported_capability_with_overlay_uses_overlay_as_effective_manifest() {
+    let root = fixture_path("catalogs/imported-overlaid");
+    let discovery = discover_catalog(&root);
+
+    assert_eq!(discovery.diagnostics, Vec::new());
+    assert_eq!(discovery.capabilities.len(), 1);
+    let capability = &discovery.capabilities[0];
+
+    assert_eq!(
+        capability.manifest.summary,
+        "Local Playwright skill overlay."
+    );
+    assert!(
+        capability
+            .manifest_path
+            .ends_with("overlays/skills/playwright/manifest.toml")
+    );
+    match &capability.source {
+        CapabilityDiscoverySource::Overlay {
+            target_manifest_path,
+            target_origin,
+            vendor_path,
+            ..
+        } => {
+            assert!(target_manifest_path.ends_with("catalog/skills/playwright/manifest.toml"));
+            assert!(
+                target_origin
+                    .as_ref()
+                    .is_some_and(|origin| { origin.requires_vendor_record() })
+            );
+            assert!(
+                vendor_path
+                    .as_ref()
+                    .expect("vendor pointer")
+                    .ends_with("vendor/skills.sh/playwright")
+            );
+        }
+        other => panic!("expected overlay source, got {other:?}"),
+    }
+}
+
+#[test]
+fn overlay_target_missing_is_reported_without_adding_capability() {
+    let root = fixture_path("catalogs/overlay-target-missing");
+    let discovery = discover_catalog(&root);
+
+    assert_eq!(discovery.capabilities.len(), 0);
+    assert!(has_code(
+        &discovery.diagnostics,
+        "catalog.overlay-target-missing"
+    ));
+}
+
+#[test]
+fn invalid_overlay_manifest_is_reported() {
+    let root = fixture_path("catalogs/overlay-invalid");
+    let discovery = discover_catalog(&root);
+
+    assert_eq!(discovery.capabilities.len(), 1);
+    assert!(has_code(&discovery.diagnostics, "catalog.manifest-invalid"));
+    assert_eq!(
+        discovery.capabilities[0].manifest.summary,
+        "Upstream Playwright skill."
+    );
 }

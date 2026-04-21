@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 1;
+pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 2;
 pub const INDEXES_DIR_NAME: &str = "indexes";
 pub const CATALOG_INDEX_FILE_NAME: &str = "catalog.json";
 
@@ -48,6 +48,7 @@ pub struct CapabilityIndexRecord {
     pub kind: String,
     pub summary: String,
     pub source_path: String,
+    pub source: CapabilitySourceSummary,
     pub runtimes: BTreeMap<String, RuntimeCompatibilitySummary>,
     pub provenance: ProvenanceSummary,
     pub requirements: RequirementSummary,
@@ -84,6 +85,17 @@ pub struct ProvenanceSummary {
     pub version: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilitySourceSummary {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normalized_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlay_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor_path: Option<String>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RequirementSummary {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -103,6 +115,12 @@ mod tests {
             kind: "skill".to_string(),
             summary: "Browser automation".to_string(),
             source_path: "catalog/skills/playwright".to_string(),
+            source: CapabilitySourceSummary {
+                kind: "local".to_string(),
+                normalized_path: Some("catalog/skills/playwright".to_string()),
+                overlay_path: None,
+                vendor_path: None,
+            },
             runtimes: BTreeMap::new(),
             provenance: ProvenanceSummary {
                 kind: "local".to_string(),

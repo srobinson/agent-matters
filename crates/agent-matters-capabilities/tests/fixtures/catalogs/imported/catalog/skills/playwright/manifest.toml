@@ -1,0 +1,15 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Upstream Playwright skill."
+
+[origin]
+type = "external"
+source = "skills.sh"
+locator = "playwright"
+version = "1.0.0"
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

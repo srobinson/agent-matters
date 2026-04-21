@@ -1,0 +1,9 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Upstream Playwright skill."
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

@@ -6,14 +6,15 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use agent_matters_core::catalog::{
-    CATALOG_INDEX_FILE_NAME, CATALOG_INDEX_SCHEMA_VERSION, CapabilityIndexRecord, CatalogIndex,
-    INDEXES_DIR_NAME, ProfileIndexRecord, ProvenanceSummary, RequirementSummary,
-    RuntimeCompatibilitySummary,
+    CATALOG_INDEX_FILE_NAME, CATALOG_INDEX_SCHEMA_VERSION, CapabilityIndexRecord,
+    CapabilitySourceSummary, CatalogIndex, INDEXES_DIR_NAME, ProfileIndexRecord, ProvenanceSummary,
+    RequirementSummary, RuntimeCompatibilitySummary,
 };
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity, Provenance};
 
 use super::{
-    CatalogDiscovery, DiscoveredCapabilityManifest, DiscoveredProfileManifest, discover_catalog,
+    CapabilityDiscoverySource, CatalogDiscovery, DiscoveredCapabilityManifest,
+    DiscoveredProfileManifest, discover_catalog,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -215,6 +216,7 @@ fn capability_record(
         kind: manifest.kind.as_str().to_string(),
         summary: manifest.summary.clone(),
         source_path: relative_path(repo_root, &entry.directory_path),
+        source: capability_source_summary(repo_root, entry),
         runtimes: manifest
             .runtimes
             .entries
@@ -231,6 +233,40 @@ fn capability_record(
             .collect(),
         provenance: provenance_summary(manifest.origin.as_ref()),
         requirements,
+    }
+}
+
+fn capability_source_summary(
+    repo_root: &Path,
+    entry: &DiscoveredCapabilityManifest,
+) -> CapabilitySourceSummary {
+    match &entry.source {
+        CapabilityDiscoverySource::Local => CapabilitySourceSummary {
+            kind: "local".to_string(),
+            normalized_path: Some(relative_path(repo_root, &entry.directory_path)),
+            overlay_path: None,
+            vendor_path: None,
+        },
+        CapabilityDiscoverySource::Imported { vendor_path } => CapabilitySourceSummary {
+            kind: "imported".to_string(),
+            normalized_path: Some(relative_path(repo_root, &entry.directory_path)),
+            overlay_path: None,
+            vendor_path: vendor_path
+                .as_ref()
+                .map(|path| relative_path(repo_root, path)),
+        },
+        CapabilityDiscoverySource::Overlay {
+            target_directory_path,
+            vendor_path,
+            ..
+        } => CapabilitySourceSummary {
+            kind: "overlaid".to_string(),
+            normalized_path: Some(relative_path(repo_root, target_directory_path)),
+            overlay_path: Some(relative_path(repo_root, &entry.directory_path)),
+            vendor_path: vendor_path
+                .as_ref()
+                .map(|path| relative_path(repo_root, path)),
+        },
     }
 }
 
@@ -346,26 +382,28 @@ fn content_fingerprint(
     repo_root: &Path,
     discovery: &CatalogDiscovery,
 ) -> Result<String, CatalogIndexError> {
-    let mut paths: Vec<&Path> = discovery
-        .capabilities
-        .iter()
-        .map(|entry| entry.manifest_path.as_path())
-        .chain(
-            discovery
-                .profiles
-                .iter()
-                .map(|entry| entry.manifest_path.as_path()),
-        )
-        .collect();
-    paths.sort();
+    let mut paths = BTreeSet::<PathBuf>::new();
+    for entry in &discovery.capabilities {
+        paths.insert(entry.manifest_path.clone());
+        if let CapabilityDiscoverySource::Overlay {
+            target_manifest_path,
+            ..
+        } = &entry.source
+        {
+            paths.insert(target_manifest_path.clone());
+        }
+    }
+    for entry in &discovery.profiles {
+        paths.insert(entry.manifest_path.clone());
+    }
 
     let mut hasher = Fnv64::new();
     hasher.write_u16(CATALOG_INDEX_SCHEMA_VERSION);
     for path in paths {
-        hasher.write(relative_path(repo_root, path).as_bytes());
+        hasher.write(relative_path(repo_root, &path).as_bytes());
         hasher.write(&[0]);
-        let bytes = fs::read(path).map_err(|source| CatalogIndexError::Read {
-            path: path.to_path_buf(),
+        let bytes = fs::read(&path).map_err(|source| CatalogIndexError::Read {
+            path: path.clone(),
             source,
         })?;
         hasher.write(&bytes);

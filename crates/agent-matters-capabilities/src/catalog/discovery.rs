@@ -6,14 +6,16 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use agent_matters_core::catalog::{
-    CATALOG_DIR_NAME, MANIFEST_FILE_NAME, PROFILES_DIR_NAME, capability_kind_dir_name,
-    known_capability_dir_names,
+    CATALOG_DIR_NAME, MANIFEST_FILE_NAME, PROFILES_DIR_NAME, VENDOR_DIR_NAME,
+    capability_kind_dir_name, known_capability_dir_names,
 };
 use agent_matters_core::domain::{
-    CapabilityKind, Diagnostic, DiagnosticLocation, DiagnosticSeverity,
+    CapabilityKind, Diagnostic, DiagnosticLocation, DiagnosticSeverity, Provenance,
 };
 use agent_matters_core::manifest::{CapabilityManifest, ProfileManifest};
 use serde::de::DeserializeOwned;
+
+use super::overlays::discover_overlays;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CatalogDiscovery {
@@ -22,8 +24,29 @@ pub struct CatalogDiscovery {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-pub type DiscoveredCapabilityManifest = DiscoveredManifest<CapabilityManifest>;
 pub type DiscoveredProfileManifest = DiscoveredManifest<ProfileManifest>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiscoveredCapabilityManifest {
+    pub manifest: CapabilityManifest,
+    pub manifest_path: PathBuf,
+    pub directory_path: PathBuf,
+    pub source: CapabilityDiscoverySource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CapabilityDiscoverySource {
+    Local,
+    Imported {
+        vendor_path: Option<PathBuf>,
+    },
+    Overlay {
+        target_manifest_path: PathBuf,
+        target_directory_path: PathBuf,
+        target_origin: Option<Provenance>,
+        vendor_path: Option<PathBuf>,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveredManifest<T> {
@@ -37,6 +60,7 @@ pub fn discover_catalog(repo_root: &Path) -> CatalogDiscovery {
 
     report_unknown_catalog_dirs(repo_root, &mut discovery.diagnostics);
     discover_capabilities(repo_root, &mut discovery);
+    discover_overlays(repo_root, &mut discovery);
     discover_profiles(repo_root, &mut discovery);
     report_duplicate_ids(&mut discovery);
 
@@ -66,7 +90,8 @@ fn discover_capabilities(repo_root: &Path, discovery: &mut CatalogDiscovery) {
                         &manifest_path,
                         &mut discovery.diagnostics,
                     );
-                    discovery.capabilities.push(DiscoveredManifest {
+                    discovery.capabilities.push(DiscoveredCapabilityManifest {
+                        source: catalog_capability_source(repo_root, &manifest),
                         manifest,
                         manifest_path,
                         directory_path: path,
@@ -141,7 +166,31 @@ fn report_unknown_catalog_dirs(repo_root: &Path, diagnostics: &mut Vec<Diagnosti
     }
 }
 
-fn load_manifest<T>(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<T>
+fn catalog_capability_source(
+    repo_root: &Path,
+    manifest: &CapabilityManifest,
+) -> CapabilityDiscoverySource {
+    match manifest.origin.as_ref() {
+        Some(origin) if origin.requires_vendor_record() => CapabilityDiscoverySource::Imported {
+            vendor_path: vendor_record_path(repo_root, origin),
+        },
+        _ => CapabilityDiscoverySource::Local,
+    }
+}
+
+pub(super) fn vendor_record_path(repo_root: &Path, origin: &Provenance) -> Option<PathBuf> {
+    match origin {
+        Provenance::External {
+            source, locator, ..
+        }
+        | Provenance::Derived {
+            source, locator, ..
+        } => Some(repo_root.join(VENDOR_DIR_NAME).join(source).join(locator)),
+        _ => None,
+    }
+}
+
+pub(super) fn load_manifest<T>(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<T>
 where
     T: DeserializeOwned,
 {
@@ -177,7 +226,10 @@ where
     }
 }
 
-fn read_dir_if_present(root: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<Vec<PathBuf>> {
+pub(super) fn read_dir_if_present(
+    root: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<Vec<PathBuf>> {
     let entries = match fs::read_dir(root) {
         Ok(entries) => entries,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return None,
@@ -215,7 +267,11 @@ fn read_dir_if_present(root: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option
     Some(paths)
 }
 
-fn report_missing_manifest(path: &Path, message: &str, diagnostics: &mut Vec<Diagnostic>) {
+pub(super) fn report_missing_manifest(
+    path: &Path,
+    message: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     diagnostics.push(
         Diagnostic::new(
             DiagnosticSeverity::Error,
@@ -227,7 +283,7 @@ fn report_missing_manifest(path: &Path, message: &str, diagnostics: &mut Vec<Dia
     );
 }
 
-fn report_capability_kind_mismatches(
+pub(super) fn report_capability_kind_mismatches(
     expected_kind: CapabilityKind,
     manifest: &CapabilityManifest,
     manifest_path: &Path,

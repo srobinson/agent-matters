@@ -1,0 +1,9 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Overlay without a normalized target."
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

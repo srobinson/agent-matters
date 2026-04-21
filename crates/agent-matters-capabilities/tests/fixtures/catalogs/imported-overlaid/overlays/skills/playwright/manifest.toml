@@ -1,0 +1,18 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Local Playwright skill overlay."
+
+[origin]
+type = "external"
+source = "skills.sh"
+locator = "playwright"
+version = "1.0.0"
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true
+
+[runtimes.claude]
+supported = true
