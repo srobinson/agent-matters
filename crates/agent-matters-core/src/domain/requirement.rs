@@ -41,8 +41,11 @@ impl EnvVarRequirement {
         if name.is_empty() {
             return Err(EnvVarRequirementError::Empty);
         }
+        if name.contains('\0') {
+            return Err(EnvVarRequirementError::ContainsNul);
+        }
         if name.contains('=') {
-            return Err(EnvVarRequirementError::ContainsEquals { name });
+            return Err(EnvVarRequirementError::ContainsEquals);
         }
         Ok(Self(name))
     }
@@ -95,8 +98,10 @@ impl<'de> Deserialize<'de> for EnvVarRequirement {
 pub enum EnvVarRequirementError {
     #[error("environment variable requirement must not be empty")]
     Empty,
-    #[error("environment variable requirement `{name}` must not contain `=`")]
-    ContainsEquals { name: String },
+    #[error("environment variable requirement must not contain nul bytes")]
+    ContainsNul,
+    #[error("environment variable requirement must not contain `=`")]
+    ContainsEquals,
 }
 
 /// Result of checking one required environment variable.
@@ -142,8 +147,21 @@ mod tests {
         );
         assert!(matches!(
             EnvVarRequirement::new("TOKEN=value"),
-            Err(EnvVarRequirementError::ContainsEquals { .. })
+            Err(EnvVarRequirementError::ContainsEquals)
         ));
+        assert_eq!(
+            EnvVarRequirement::new("TOKEN\0"),
+            Err(EnvVarRequirementError::ContainsNul)
+        );
+    }
+
+    #[test]
+    fn env_var_assignment_error_does_not_echo_secret() {
+        let err = EnvVarRequirement::new("TOKEN=secret-value").unwrap_err();
+        let message = err.to_string();
+
+        assert!(!message.contains("TOKEN"));
+        assert!(!message.contains("secret-value"));
     }
 
     #[test]
