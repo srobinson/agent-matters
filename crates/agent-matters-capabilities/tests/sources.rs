@@ -231,6 +231,43 @@ fn import_storage_rejects_escape_paths_before_writing_manifest() {
     );
 }
 
+#[test]
+fn import_storage_rejects_escape_source_or_locator_before_writing() {
+    for (source, locator) in [
+        ("../skills.sh", "playwright"),
+        ("skills.sh", "../playwright"),
+    ] {
+        let repo = TempDir::new().unwrap();
+        let adapter = FakeSourceAdapter;
+        let mut import = adapter
+            .import_capability(SourceImportRequest {
+                locator: "playwright".to_string(),
+            })
+            .unwrap();
+        import.source = source.to_string();
+        import.locator = locator.to_string();
+        import.manifest.origin = Some(Provenance::external(
+            source,
+            locator,
+            Some("1.0.0".to_string()),
+        ));
+
+        let err = write_source_import(WriteSourceImportRequest {
+            repo_root: repo.path().to_path_buf(),
+            import,
+            replace_existing: false,
+        })
+        .unwrap_err();
+
+        assert!(matches!(
+            err,
+            SourceImportStorageError::InvalidRelativePath { .. }
+        ));
+        assert!(!repo.path().join("catalog").exists());
+        assert!(!repo.path().join("vendor").exists());
+    }
+}
+
 fn fake_manifest(locator: &str) -> CapabilityManifest {
     let mut files = BTreeMap::new();
     files.insert("source".to_string(), "SKILL.md".to_string());

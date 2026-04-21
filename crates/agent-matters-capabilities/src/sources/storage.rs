@@ -84,11 +84,11 @@ pub fn write_source_import(
         .join(CATALOG_DIR_NAME)
         .join(capability_kind_dir_name(request.import.manifest.kind))
         .join(request.import.manifest.id.body());
-    let vendor_dir = request
-        .repo_root
-        .join(VENDOR_DIR_NAME)
-        .join(&request.import.source)
-        .join(&request.import.locator);
+    let vendor_dir = validated_vendor_dir(
+        &request.repo_root,
+        &request.import.source,
+        &request.import.locator,
+    )?;
 
     if !request.replace_existing {
         reject_existing(&capability_dir)?;
@@ -183,6 +183,22 @@ fn validate_file_set(
         .collect()
 }
 
+fn validated_vendor_dir(
+    repo_root: &Path,
+    source: &str,
+    locator: &str,
+) -> Result<PathBuf, SourceImportStorageError> {
+    let source_path = Path::new(source);
+    let locator_path = Path::new(locator);
+    validate_relative_path(source_path)?;
+    validate_relative_path(locator_path)?;
+
+    Ok(repo_root
+        .join(VENDOR_DIR_NAME)
+        .join(source_path)
+        .join(locator_path))
+}
+
 fn write_file_set(
     files: &[SourceImportFile],
     paths: &[PathBuf],
@@ -197,6 +213,11 @@ fn write_file_set(
 }
 
 fn validated_child_path(base: &Path, relative: &Path) -> Result<PathBuf, SourceImportStorageError> {
+    validate_relative_path(relative)?;
+    Ok(base.join(relative))
+}
+
+fn validate_relative_path(relative: &Path) -> Result<(), SourceImportStorageError> {
     if relative.as_os_str().is_empty() || relative.is_absolute() {
         return Err(SourceImportStorageError::InvalidRelativePath {
             path: relative.to_path_buf(),
@@ -211,7 +232,7 @@ fn validated_child_path(base: &Path, relative: &Path) -> Result<PathBuf, SourceI
         }
     }
 
-    Ok(base.join(relative))
+    Ok(())
 }
 
 fn create_dir_all(path: &Path) -> Result<(), SourceImportStorageError> {
