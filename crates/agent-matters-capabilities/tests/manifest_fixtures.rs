@@ -56,10 +56,9 @@ fn valid_capability_manifest_fixture_parses() {
             .unwrap()
             .supported
     );
-    assert_eq!(
-        manifest.requires.unwrap().env,
-        vec!["LINEAR_API_KEY".to_string()]
-    );
+    let requires = manifest.requires.unwrap();
+    assert_eq!(requires.env.len(), 1);
+    assert_eq!(requires.env[0].name(), "LINEAR_API_KEY");
 }
 
 #[test]

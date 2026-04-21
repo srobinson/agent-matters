@@ -7,7 +7,9 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{CapabilityId, ProfileId, ProfileKind, RuntimeId};
+use crate::domain::{CapabilityId, ProfileId, ProfileKind, RuntimeId, ScopeConstraints};
+
+pub use crate::domain::ScopeEnforcement;
 
 /// Authored `profiles/<id>/manifest.toml`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,25 +29,8 @@ pub struct ProfileManifest {
 }
 
 /// Optional `[scope]` table. Validation of paths and repo constraints belongs
-/// to ALP-1925; this schema only preserves the authored values.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ProfileScopeManifest {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub paths: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub github_repos: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enforcement: Option<ScopeEnforcement>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum ScopeEnforcement {
-    None,
-    Warn,
-    Fail,
-}
+/// to the pure scope domain type.
+pub type ProfileScopeManifest = ScopeConstraints;
 
 /// `[runtimes]` table with an optional scalar `default` and explicit
 /// per-runtime subtables.

@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{CapabilityId, CapabilityKind, RuntimeId};
+use crate::domain::{CapabilityId, CapabilityKind, Provenance, Requirements, RuntimeId};
 
 /// Authored `catalog/<kind>/<id>/manifest.toml`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,27 +48,11 @@ pub struct CapabilityRuntimeManifest {
 }
 
 /// Optional `[requires]` table. Dependency validation is a later compile time
-/// concern; this schema only parses the authored references.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CapabilityRequirementsManifest {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub capabilities: Vec<CapabilityId>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub env: Vec<String>,
-}
+/// concern; this schema reuses the semantic requirements type.
+pub type CapabilityRequirementsManifest = Requirements;
 
 /// Optional `[origin]` table used by imported or derived capabilities.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct OriginManifest {
-    #[serde(rename = "type")]
-    pub origin_type: String,
-    pub source: String,
-    pub locator: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-}
+pub type OriginManifest = Provenance;
 
 #[cfg(test)]
 mod tests {
