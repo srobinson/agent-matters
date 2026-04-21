@@ -15,6 +15,7 @@ pub mod capabilities;
 pub mod catalog;
 pub mod config;
 pub mod profiles;
+pub mod sources;
 
 /// Crate version exposed for diagnostics and version banners.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
