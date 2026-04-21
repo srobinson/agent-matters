@@ -22,7 +22,7 @@ pub(super) fn credential_symlinks_for_adapter(
     }
     let Some(native_home_dir) = native_home_dir else {
         diagnostics.push(credential_home_missing(adapter.id()));
-        return Vec::new();
+        return missing_credential_symlinks(&allowlist);
     };
     let Some(source_dir) = adapter.credential_source_dir(native_home_dir) else {
         return Vec::new();
@@ -31,6 +31,15 @@ pub(super) fn credential_symlinks_for_adapter(
     allowlist
         .iter()
         .map(|entry| credential_symlink(adapter.id(), &source_dir, entry, diagnostics))
+        .collect()
+}
+
+fn missing_credential_symlinks(
+    allowlist: &[CredentialSymlinkAllowlistEntry],
+) -> Vec<CredentialSymlink> {
+    allowlist
+        .iter()
+        .map(|entry| CredentialSymlink::new(None, &entry.target_path))
         .collect()
 }
 

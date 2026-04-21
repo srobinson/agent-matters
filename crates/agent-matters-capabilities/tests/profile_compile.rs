@@ -212,6 +212,44 @@ fn compile_removes_stale_codex_auth_symlink_when_source_is_missing_on_reuse() {
 }
 
 #[test]
+fn compile_removes_stale_codex_auth_symlink_when_native_home_is_missing_on_reuse() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let request = compile_request(repo.path(), state.path());
+    let native_home = request.native_home_dir.clone().unwrap();
+    let first = compile_profile_build(request.clone())
+        .unwrap()
+        .build
+        .unwrap();
+    assert_eq!(
+        fs::read_link(first.home_dir.join("auth.json")).unwrap(),
+        native_home.join(".codex/auth.json")
+    );
+    let mut missing_home_request = request;
+    missing_home_request.native_home_dir = None;
+
+    let result = compile_profile_build(missing_home_request).unwrap();
+
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(
+        result.diagnostics[0].code,
+        "runtime.credential-home-missing"
+    );
+    let build = result.build.unwrap();
+    assert_eq!(build.status, ProfileBuildWriteStatus::Reused);
+    assert_eq!(build.credential_symlinks.len(), 1);
+    assert_eq!(build.credential_symlinks[0].source_path, None);
+    assert_eq!(
+        build.credential_symlinks[0].target_path,
+        PathBuf::from("auth.json")
+    );
+    assert!(matches!(
+        fs::symlink_metadata(build.home_dir.join("auth.json")),
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound
+    ));
+}
+
+#[test]
 fn compile_fingerprint_excludes_codex_auth_contents() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
