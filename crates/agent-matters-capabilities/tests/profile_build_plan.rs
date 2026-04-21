@@ -6,6 +6,7 @@ use std::path::Path;
 use agent_matters_capabilities::profiles::{
     BuildProfilePlanRequest, ProfileBuildPlan, plan_profile_build,
 };
+use agent_matters_core::domain::DiagnosticSeverity;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -153,6 +154,43 @@ enabled = true
 }
 
 #[test]
+fn missing_referenced_content_file_reports_input_diagnostic() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    fs::remove_file(
+        repo.path()
+            .join("catalog/instructions/helioy-core/AGENTS.md"),
+    )
+    .unwrap();
+
+    let result = plan_profile_build(BuildProfilePlanRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: state.path().to_path_buf(),
+        profile: "github-researcher".to_string(),
+        runtime: Some("codex".to_string()),
+    })
+    .unwrap();
+
+    assert!(result.plan.is_none());
+    assert_eq!(result.diagnostics.len(), 1);
+    let diagnostic = &result.diagnostics[0];
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert_eq!(diagnostic.code, "profile.build-plan.input-read-failed");
+    assert!(
+        diagnostic
+            .message
+            .contains("catalog/instructions/helioy-core/AGENTS.md")
+    );
+    assert_eq!(
+        diagnostic
+            .location
+            .as_ref()
+            .and_then(|location| location.manifest_path.as_deref()),
+        Some(Path::new("catalog/instructions/helioy-core/AGENTS.md"))
+    );
+}
+
+#[test]
 fn build_plan_json_shape_is_stable() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
@@ -175,56 +213,7 @@ fn expected_build_plan_json() -> Value {
             "runtime_pointer": "runtimes/github-researcher/codex"
         },
         "profile_record": profile_record_json(),
-        "effective_capabilities": [
-            local_capability(
-                "skill:playwright",
-                "skill",
-                "Playwright browser automation skill.",
-                "source",
-                "SKILL.md",
-                "catalog/skills/renamed-skill-dir",
-            ),
-            local_capability(
-                "mcp:linear",
-                "mcp",
-                "Linear MCP server.",
-                "manifest",
-                "server.toml",
-                "catalog/mcp/linear",
-            ),
-            local_capability(
-                "hook:session-logger",
-                "hook",
-                "Session handover hook.",
-                "script",
-                "hook.sh",
-                "catalog/hooks/session-logger",
-            ),
-            local_capability(
-                "runtime-setting:codex-defaults",
-                "runtime-setting",
-                "Codex runtime defaults.",
-                "settings",
-                "config.toml",
-                "catalog/runtime-settings/codex-defaults",
-            ),
-            local_capability(
-                "instruction:helioy-core",
-                "instruction",
-                "Core Helioy operating instructions.",
-                "content",
-                "AGENTS.md",
-                "catalog/instructions/helioy-core",
-            ),
-            local_capability(
-                "agent:github-researcher",
-                "agent",
-                "GitHub research specialist agent.",
-                "instructions",
-                "AGENT.md",
-                "catalog/agents/github-researcher",
-            ),
-        ],
+        "effective_capabilities": effective_capabilities_json(),
         "instruction_fragments": [
             {
                 "id": "instruction:helioy-core",
@@ -246,74 +235,131 @@ fn expected_build_plan_json() -> Value {
         "runtime_config": {
             "id": "codex"
         },
-        "content_inputs": [
-            content_input(
-                "profile-manifest",
-                "profiles/renamed-profile-dir/manifest.toml",
-                "fnv64:6796138a39687371",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/agents/github-researcher/manifest.toml",
-                "fnv64:80d487270fab45ac",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/hooks/session-logger/manifest.toml",
-                "fnv64:59e2fd65b6b7c50d",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/instructions/helioy-core/manifest.toml",
-                "fnv64:ee5f5e0ffb700287",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/mcp/linear/manifest.toml",
-                "fnv64:8bf04d99ba6800f4",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/runtime-settings/codex-defaults/manifest.toml",
-                "fnv64:e0ba7e4251b914fc",
-            ),
-            content_input(
-                "capability-manifest",
-                "catalog/skills/renamed-skill-dir/manifest.toml",
-                "fnv64:3638056d9550bf9e",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/agents/github-researcher/AGENT.md",
-                "fnv64:ab8da577f565b227",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/hooks/session-logger/hook.sh",
-                "fnv64:e82673ea83700a66",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/instructions/helioy-core/AGENTS.md",
-                "fnv64:a2cf8bcab5d06541",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/mcp/linear/server.toml",
-                "fnv64:aeddd797bea0b263",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/runtime-settings/codex-defaults/config.toml",
-                "fnv64:cbb301a15a1cf3c2",
-            ),
-            content_input(
-                "capability-file",
-                "catalog/skills/renamed-skill-dir/SKILL.md",
-                "fnv64:daed9f9bc506357f",
-            ),
-        ]
+        "content_inputs": content_inputs_json()
     })
+}
+
+fn effective_capabilities_json() -> Value {
+    json!([
+        local_capability(
+            "skill:playwright",
+            "skill",
+            "Playwright browser automation skill.",
+            "source",
+            "SKILL.md",
+            "catalog/skills/renamed-skill-dir",
+        ),
+        local_capability(
+            "mcp:linear",
+            "mcp",
+            "Linear MCP server.",
+            "manifest",
+            "server.toml",
+            "catalog/mcp/linear",
+        ),
+        local_capability(
+            "hook:session-logger",
+            "hook",
+            "Session handover hook.",
+            "script",
+            "hook.sh",
+            "catalog/hooks/session-logger",
+        ),
+        local_capability(
+            "runtime-setting:codex-defaults",
+            "runtime-setting",
+            "Codex runtime defaults.",
+            "settings",
+            "config.toml",
+            "catalog/runtime-settings/codex-defaults",
+        ),
+        local_capability(
+            "instruction:helioy-core",
+            "instruction",
+            "Core Helioy operating instructions.",
+            "content",
+            "AGENTS.md",
+            "catalog/instructions/helioy-core",
+        ),
+        local_capability(
+            "agent:github-researcher",
+            "agent",
+            "GitHub research specialist agent.",
+            "instructions",
+            "AGENT.md",
+            "catalog/agents/github-researcher",
+        ),
+    ])
+}
+
+fn content_inputs_json() -> Value {
+    json!([
+        content_input(
+            "profile-manifest",
+            "profiles/renamed-profile-dir/manifest.toml",
+            "fnv64:6796138a39687371",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/agents/github-researcher/manifest.toml",
+            "fnv64:80d487270fab45ac",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/hooks/session-logger/manifest.toml",
+            "fnv64:59e2fd65b6b7c50d",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/instructions/helioy-core/manifest.toml",
+            "fnv64:ee5f5e0ffb700287",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/mcp/linear/manifest.toml",
+            "fnv64:8bf04d99ba6800f4",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/runtime-settings/codex-defaults/manifest.toml",
+            "fnv64:e0ba7e4251b914fc",
+        ),
+        content_input(
+            "capability-manifest",
+            "catalog/skills/renamed-skill-dir/manifest.toml",
+            "fnv64:3638056d9550bf9e",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/agents/github-researcher/AGENT.md",
+            "fnv64:ab8da577f565b227",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/hooks/session-logger/hook.sh",
+            "fnv64:e82673ea83700a66",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/instructions/helioy-core/AGENTS.md",
+            "fnv64:a2cf8bcab5d06541",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/mcp/linear/server.toml",
+            "fnv64:aeddd797bea0b263",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/runtime-settings/codex-defaults/config.toml",
+            "fnv64:cbb301a15a1cf3c2",
+        ),
+        content_input(
+            "capability-file",
+            "catalog/skills/renamed-skill-dir/SKILL.md",
+            "fnv64:daed9f9bc506357f",
+        ),
+    ])
 }
 
 fn content_input(role: &str, path: &str, content_fingerprint: &str) -> Value {
