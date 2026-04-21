@@ -3,6 +3,7 @@
 mod adapter;
 mod build_plan;
 mod build_writer;
+mod claude_adapter;
 mod codex_adapter;
 mod compile;
 mod credential_symlinks;

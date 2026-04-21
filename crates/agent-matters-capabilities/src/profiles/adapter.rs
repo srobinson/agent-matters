@@ -9,6 +9,7 @@ use agent_matters_core::runtime::{
     CredentialSymlinkAllowlistEntry, RuntimeHomeFile, RuntimeLaunchInstructions,
 };
 
+use super::claude_adapter::ClaudeRuntimeAdapter;
 use super::codex_adapter::CodexRuntimeAdapter;
 use super::{AssembledProfileInstructions, ProfileBuildPlan, ResolvedRuntimeConfig};
 
@@ -76,18 +77,6 @@ pub struct RuntimeHomeRenderResult {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-impl RuntimeHomeRenderResult {
-    fn with_instruction_file(instructions: &AssembledProfileInstructions) -> Self {
-        Self {
-            files: vec![RuntimeHomeFile::text(
-                &instructions.relative_path,
-                instructions.content.clone(),
-            )],
-            diagnostics: Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeLaunchRequest<'a> {
     pub runtime_home: &'a Path,
@@ -109,33 +98,6 @@ pub fn adapter_for_runtime(runtime: &str) -> Option<&'static dyn RuntimeAdapter>
     runtime_adapters()
         .into_iter()
         .find(|adapter| adapter.id() == runtime)
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ClaudeRuntimeAdapter;
-
-impl RuntimeAdapter for ClaudeRuntimeAdapter {
-    fn id(&self) -> &'static str {
-        CLAUDE_RUNTIME_ID
-    }
-
-    fn version(&self) -> &'static str {
-        "agent-matters:claude:adapter:v1"
-    }
-
-    fn render_home(&self, request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult {
-        let _ = request.repo_root;
-        let _ = request.plan;
-        RuntimeHomeRenderResult::with_instruction_file(request.instructions)
-    }
-
-    fn launch_instructions(&self, request: RuntimeLaunchRequest<'_>) -> RuntimeLaunchInstructions {
-        launch_instructions(
-            "CLAUDE_CONFIG_DIR",
-            request.runtime_home,
-            vec!["claude".to_string(), request.workspace_path.to_string()],
-        )
-    }
 }
 
 pub(super) fn launch_instructions(
@@ -204,8 +166,11 @@ mod tests {
             "agent-matters:fixture:adapter:v1"
         }
 
-        fn render_home(&self, request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult {
-            RuntimeHomeRenderResult::with_instruction_file(request.instructions)
+        fn render_home(&self, _request: RuntimeHomeRenderRequest<'_>) -> RuntimeHomeRenderResult {
+            RuntimeHomeRenderResult {
+                files: Vec::new(),
+                diagnostics: Vec::new(),
+            }
         }
 
         fn credential_symlink_allowlist(&self) -> Vec<CredentialSymlinkAllowlistEntry> {
