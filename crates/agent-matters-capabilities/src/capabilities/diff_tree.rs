@@ -1,10 +1,13 @@
 //! Recursive file tree comparison for capability overlay diffs.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use super::diff::{CapabilityDiffError, CapabilityDiffFile, CapabilityDiffStatus, diff_file};
+
+const FILE_COMPARE_CHUNK_SIZE: usize = 8192;
 
 pub(super) fn diff_directories(
     base: &Path,
@@ -100,14 +103,46 @@ fn files_differ(base: &FileEntry, overlay: &FileEntry) -> Result<bool, Capabilit
         return Ok(true);
     }
 
-    Ok(read_file(&base.path)? != read_file(&overlay.path)?)
+    Ok(!files_equal(base, overlay)?)
 }
 
-fn read_file(path: &Path) -> Result<Vec<u8>, CapabilityDiffError> {
-    fs::read(path).map_err(|source| CapabilityDiffError::ReadFile {
+fn files_equal(base: &FileEntry, overlay: &FileEntry) -> Result<bool, CapabilityDiffError> {
+    let mut base_file = open_file(&base.path)?;
+    let mut overlay_file = open_file(&overlay.path)?;
+    let mut base_buffer = [0; FILE_COMPARE_CHUNK_SIZE];
+    let mut overlay_buffer = [0; FILE_COMPARE_CHUNK_SIZE];
+    let mut remaining = base.len;
+
+    while remaining > 0 {
+        let chunk_len = remaining.min(FILE_COMPARE_CHUNK_SIZE as u64) as usize;
+        read_chunk(&mut base_file, &mut base_buffer[..chunk_len], &base.path)?;
+        read_chunk(
+            &mut overlay_file,
+            &mut overlay_buffer[..chunk_len],
+            &overlay.path,
+        )?;
+        if base_buffer[..chunk_len] != overlay_buffer[..chunk_len] {
+            return Ok(false);
+        }
+        remaining -= chunk_len as u64;
+    }
+
+    Ok(true)
+}
+
+fn open_file(path: &Path) -> Result<File, CapabilityDiffError> {
+    File::open(path).map_err(|source| CapabilityDiffError::ReadFile {
         path: path.to_path_buf(),
         source,
     })
+}
+
+fn read_chunk(file: &mut File, buffer: &mut [u8], path: &Path) -> Result<(), CapabilityDiffError> {
+    file.read_exact(buffer)
+        .map_err(|source| CapabilityDiffError::ReadFile {
+            path: path.to_path_buf(),
+            source,
+        })
 }
 
 fn relative_file_path(root: &Path, path: &Path) -> String {
