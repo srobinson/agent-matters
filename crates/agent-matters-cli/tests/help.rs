@@ -1,5 +1,7 @@
-//! CLI integration smoke test. Covers ALP-1919 acceptance criterion that
-//! `agent-matters --help` prints a useful top level help screen.
+//! CLI help surface integration tests.
+//!
+//! Covers ALP-1919 (smoke help) and ALP-1920 (noun first structure and
+//! generated help pattern).
 
 use assert_cmd::Command;
 use predicates::str::contains;
@@ -17,7 +19,8 @@ fn help_prints_command_groups() {
         .stdout(contains("profiles"))
         .stdout(contains("capabilities"))
         .stdout(contains("sources"))
-        .stdout(contains("doctor"));
+        .stdout(contains("doctor"))
+        .stdout(contains("completions"));
 }
 
 #[test]
@@ -30,6 +33,12 @@ fn version_prints_crate_version() {
 }
 
 #[test]
-fn no_command_exits_non_zero() {
-    bin().assert().failure().code(2);
+fn bare_invocation_prints_long_help() {
+    bin()
+        .assert()
+        .success()
+        .stdout(contains("profiles"))
+        .stdout(contains("capabilities"))
+        .stdout(contains("sources"))
+        .stdout(contains("doctor"));
 }

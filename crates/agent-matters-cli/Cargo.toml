@@ -19,6 +19,7 @@ path = "src/main.rs"
 agent-matters-capabilities = { workspace = true }
 agent-matters-core = { workspace = true }
 clap = { workspace = true }
+clap_complete = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
