@@ -311,6 +311,7 @@ fn profile_record(repo_root: &Path, entry: &DiscoveredProfileManifest) -> Profil
             .iter()
             .map(ToString::to_string)
             .collect(),
+        scope: manifest.scope.clone().unwrap_or_default(),
         source_path: relative_path(repo_root, &entry.directory_path),
         runtimes,
         default_runtime,

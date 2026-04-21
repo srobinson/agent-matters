@@ -7,7 +7,9 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 4;
+use crate::domain::ScopeConstraints;
+
+pub const CATALOG_INDEX_SCHEMA_VERSION: u16 = 5;
 pub const INDEXES_DIR_NAME: &str = "indexes";
 pub const CATALOG_INDEX_FILE_NAME: &str = "catalog.json";
 
@@ -63,6 +65,8 @@ pub struct ProfileIndexRecord {
     pub summary: String,
     pub capabilities: Vec<String>,
     pub instructions: Vec<String>,
+    #[serde(default, skip_serializing_if = "ScopeConstraints::is_empty")]
+    pub scope: ScopeConstraints,
     pub source_path: String,
     pub runtimes: BTreeMap<String, RuntimeCompatibilitySummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -141,6 +145,7 @@ mod tests {
             summary: "GitHub research".to_string(),
             capabilities: vec!["skill:playwright".to_string()],
             instructions: vec!["instruction:helioy-core".to_string()],
+            scope: ScopeConstraints::default(),
             source_path: "profiles/github-researcher".to_string(),
             runtimes: BTreeMap::new(),
             default_runtime: Some("codex".to_string()),

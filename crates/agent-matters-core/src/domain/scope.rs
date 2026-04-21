@@ -49,6 +49,16 @@ impl ScopeEnforcement {
     }
 }
 
+impl ScopeConstraints {
+    pub fn is_empty(&self) -> bool {
+        self.paths.is_empty() && self.github_repos.is_empty() && self.enforcement.is_none()
+    }
+
+    pub fn has_allowed_targets(&self) -> bool {
+        !self.paths.is_empty() || !self.github_repos.is_empty()
+    }
+}
+
 impl fmt::Display for ScopeEnforcement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
