@@ -2,6 +2,7 @@
 name = "agent-matters-capabilities"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Use cases and orchestration for agent-matters runtime profiles"
