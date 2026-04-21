@@ -1,0 +1,9 @@
+id = "mcp:linear"
+kind = "mcp"
+summary = "Linear MCP server."
+
+[files]
+manifest = "server.toml"
+
+[runtimes.codex]
+supported = true

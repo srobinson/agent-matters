@@ -1,0 +1,9 @@
+id = "runtime-setting:codex-defaults"
+kind = "runtime-setting"
+summary = "Codex runtime defaults."
+
+[files]
+settings = "config.toml"
+
+[runtimes.codex]
+supported = true

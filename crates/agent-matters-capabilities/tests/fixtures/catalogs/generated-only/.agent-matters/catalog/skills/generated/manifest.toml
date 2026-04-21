@@ -1,0 +1,9 @@
+id = "skill:generated"
+kind = "skill"
+summary = "Generated state should not be discovered."
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

@@ -12,6 +12,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod catalog;
 pub mod config;
 
 /// Crate version exposed for diagnostics and version banners.

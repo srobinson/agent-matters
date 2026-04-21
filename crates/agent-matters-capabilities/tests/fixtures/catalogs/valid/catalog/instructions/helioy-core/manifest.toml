@@ -1,0 +1,9 @@
+id = "instruction:helioy-core"
+kind = "instruction"
+summary = "Core Helioy operating instructions."
+
+[files]
+content = "AGENTS.md"
+
+[runtimes.codex]
+supported = true

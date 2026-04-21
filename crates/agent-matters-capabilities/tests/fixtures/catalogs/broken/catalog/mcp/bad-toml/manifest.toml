@@ -1,0 +1,4 @@
+id = "mcp:bad"
+kind = "mcp"
+summary = "Broken TOML"
+this = is = not = valid

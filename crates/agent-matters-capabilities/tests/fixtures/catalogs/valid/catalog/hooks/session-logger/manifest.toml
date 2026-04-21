@@ -1,0 +1,9 @@
+id = "hook:session-logger"
+kind = "hook"
+summary = "Session handover hook."
+
+[files]
+script = "hook.sh"
+
+[runtimes.codex]
+supported = true
