@@ -1,6 +1,8 @@
 //! Profile use cases.
 
 mod build_plan;
+mod build_writer;
+mod compile;
 mod list;
 mod requirements;
 mod resolve;
@@ -13,6 +15,11 @@ pub use build_plan::{
     BuildPlanContentInput, BuildPlanPaths, BuildProfilePlanRequest, BuildProfilePlanResult,
     ProfileBuildPlan, plan_profile_build,
 };
+pub use build_writer::{
+    ProfileBuildWriteStatus, WriteProfileBuildRequest, WriteProfileBuildResult,
+    WrittenProfileBuild, write_profile_build,
+};
+pub use compile::{CompileProfileBuildRequest, CompileProfileBuildResult, compile_profile_build};
 pub use list::{ListProfilesRequest, ListProfilesResult, list_profiles};
 pub use requirements::{
     CapabilityRequirementCheck, EnvRequirementCheck, ProfileRequirementValidationMode,
