@@ -183,6 +183,37 @@ enforcement = "fail"
 }
 
 #[test]
+fn non_origin_github_remote_does_not_satisfy_repo_scope() {
+    let repo = valid_repo();
+    let workspace = repo.path().join("project");
+    let git_dir = workspace.join(".git");
+    fs::create_dir_all(&git_dir).unwrap();
+    fs::write(
+        git_dir.join("config"),
+        r#"
+[remote "origin"]
+    url = git@gitlab.com:srobinson/helioy.git
+[remote "upstream"]
+    url = git@github.com:srobinson/helioy.git
+"#,
+    )
+    .unwrap();
+    set_scope(
+        &repo,
+        r#"github_repos = ["srobinson/helioy"]
+enforcement = "fail"
+"#,
+    );
+
+    let result = validate(&repo, &workspace);
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::OutOfScope);
+    assert_eq!(result.detected_github_repo, None);
+    assert!(result.has_error_diagnostics());
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+}
+
+#[test]
 fn omitted_use_path_defaults_to_current_working_directory() {
     let repo = valid_repo();
     let cwd = std::env::current_dir().unwrap();

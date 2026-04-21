@@ -14,10 +14,26 @@ pub(super) fn matched_github_repo(detected: &str, allowed_repos: &[String]) -> O
 pub(super) fn detect_github_repo(workspace: &Path) -> Option<String> {
     let config_path = git_config_path(workspace)?;
     let config = fs::read_to_string(config_path).ok()?;
-    config
-        .lines()
-        .filter_map(|line| line.trim().strip_prefix("url =").map(str::trim))
-        .find_map(normalize_github_repo)
+    let mut in_origin = false;
+
+    for raw_line in config.lines() {
+        let line = raw_line.trim();
+        if line.starts_with('[') && line.ends_with(']') {
+            in_origin = is_origin_remote_section(line);
+            continue;
+        }
+        if !in_origin {
+            continue;
+        }
+        let Some(url) = remote_url(line) else {
+            continue;
+        };
+        if let Some(repo) = normalize_github_repo(url) {
+            return Some(repo);
+        }
+    }
+
+    None
 }
 
 fn normalize_allowed_repo(raw: &str) -> String {
@@ -63,6 +79,17 @@ fn git_file_config_path(dot_git: &Path) -> Option<PathBuf> {
         gitdir.join(common.trim())
     };
     Some(common.join("config"))
+}
+
+fn is_origin_remote_section(line: &str) -> bool {
+    line.strip_prefix("[remote ")
+        .and_then(|section| section.strip_suffix(']'))
+        .is_some_and(|section| section.trim() == r#""origin""#)
+}
+
+fn remote_url(line: &str) -> Option<&str> {
+    let (key, value) = line.split_once('=')?;
+    (key.trim() == "url").then_some(value.trim())
 }
 
 fn normalize_github_repo(url: &str) -> Option<String> {
