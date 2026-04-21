@@ -12,6 +12,9 @@ pub const RUNTIMES_FILE_NAME: &str = "runtimes.toml";
 /// Repo default file carrying project markers.
 pub const MARKERS_FILE_NAME: &str = "markers.toml";
 
+/// Repo default file carrying external source trust policy.
+pub const SOURCES_FILE_NAME: &str = "sources.toml";
+
 /// User machine config directory (under the user's home directory).
 pub const USER_CONFIG_DIR_NAME: &str = ".agent-matters";
 

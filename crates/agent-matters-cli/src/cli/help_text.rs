@@ -72,7 +72,8 @@ pub const SOURCES_SEARCH_AFTER_HELP: &str =
 #[rustfmt::skip]
 pub const SOURCES_IMPORT_AFTER_HELP: &str =
 "Examples:\n  \
-  agent-matters sources import skills.sh:owner/repo@skill-name";
+  agent-matters sources import skills.sh:owner/repo@skill-name\n  \
+  agent-matters sources import skills.sh:owner/repo@skill-name --json";
 
 #[rustfmt::skip]
 pub const DOCTOR_AFTER_HELP: &str =

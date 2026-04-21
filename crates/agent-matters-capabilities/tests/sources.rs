@@ -4,10 +4,12 @@ use std::path::PathBuf;
 
 use agent_matters_capabilities::catalog::{CapabilityDiscoverySource, discover_catalog};
 use agent_matters_capabilities::sources::{
-    SourceAdapter, SourceAdapterError, SourceImportFile, SourceImportRequest, SourceImportResult,
-    SourceImportStorageError, SourceSearchEntry, SourceSearchRequest, SourceSearchResult,
-    WriteSourceImportRequest, write_source_import,
+    ImportSourceAdapterRequest, ImportSourceRequest, SourceAdapter, SourceAdapterError,
+    SourceImportFile, SourceImportRequest, SourceImportResult, SourceImportStorageError,
+    SourceSearchEntry, SourceSearchRequest, SourceSearchResult, WriteSourceImportRequest,
+    import_source, import_source_from_adapter_with_policy, write_source_import,
 };
+use agent_matters_core::config::{SourceTrustPolicy, SourceTrustRule};
 use agent_matters_core::domain::{
     CapabilityId, CapabilityKind, Diagnostic, DiagnosticSeverity, Provenance, RuntimeId,
 };
@@ -198,6 +200,61 @@ fn source_adapter_error_maps_to_source_diagnostic() {
     assert!(diagnostic.message.contains("skills.sh"));
     assert!(diagnostic.message.contains("missing"));
     assert!(!diagnostic.code.starts_with("catalog."));
+}
+
+#[test]
+fn source_trust_policy_blocks_unknown_source_import() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+
+    let err = import_source(ImportSourceRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: state.path().to_path_buf(),
+        locator: "unknown:playwright".to_string(),
+        replace_existing: false,
+    })
+    .unwrap_err();
+
+    let diagnostic = err.to_diagnostic();
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert_eq!(diagnostic.code, "source.trust-blocked");
+    assert!(diagnostic.message.contains("unknown"));
+    assert!(diagnostic.message.contains("capability kind `unknown`"));
+    assert!(!repo.path().join("catalog").exists());
+}
+
+#[test]
+fn source_trust_policy_blocks_disallowed_capability_kind_before_writing() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    let adapter = FakeSourceAdapter;
+    let policy = SourceTrustPolicy {
+        sources: BTreeMap::from([(
+            "skills.sh".to_string(),
+            SourceTrustRule {
+                kinds: vec![CapabilityKind::Mcp],
+            },
+        )]),
+    };
+
+    let err = import_source_from_adapter_with_policy(
+        ImportSourceAdapterRequest {
+            repo_root: repo.path().to_path_buf(),
+            user_state_dir: state.path().to_path_buf(),
+            locator: "playwright".to_string(),
+            replace_existing: false,
+            adapter: &adapter,
+        },
+        &policy,
+    )
+    .unwrap_err();
+
+    let diagnostic = err.to_diagnostic();
+    assert_eq!(diagnostic.code, "source.trust-blocked");
+    assert!(diagnostic.message.contains("skills.sh"));
+    assert!(diagnostic.message.contains("skill"));
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
 }
 
 #[test]

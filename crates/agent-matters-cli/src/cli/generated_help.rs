@@ -78,6 +78,8 @@ pub const SOURCES_SEARCH_JSON_HELP: &str = "Emit machine readable JSON instead o
 pub const SOURCES_IMPORT_ABOUT: &str = "Import a capability from a source by locator.\n\nWrites normalized capability files into the catalog, preserves raw source material under `vendor`, and records provenance so future syncs and diffs can detect drift.";
 #[rustfmt::skip]
 pub const SOURCES_IMPORT_LOCATOR_HELP: &str = "Source specific locator (scheme determined by the source adapter)";
+#[rustfmt::skip]
+pub const SOURCES_IMPORT_JSON_HELP: &str = "Emit machine readable JSON instead of the human summary";
 
 #[rustfmt::skip]
 pub const DOCTOR_ABOUT: &str = "Diagnose catalog, runtime, and auth setup.\n\nRuns the full suite of local integrity checks: catalog discovery, manifest schema, capability requirement resolution, required environment variables, overlay and vendor consistency, runtime adapter reachability, and credential allowlist presence. Reports findings grouped by severity.";

@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::CapabilityKind;
 use crate::manifest::InstructionMarkers;
 
 /// Per-runtime settings shared between repo defaults and user config.
@@ -64,6 +65,45 @@ pub struct InstructionOutputDefaults {
     pub markers: Option<InstructionMarkers>,
 }
 
+/// Policy that decides which external sources may import which capability
+/// kinds. Runtime permissions are outside this MVP policy surface.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceTrustPolicy {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sources: BTreeMap<String, SourceTrustRule>,
+}
+
+impl SourceTrustPolicy {
+    pub fn conservative_default() -> Self {
+        let mut sources = BTreeMap::new();
+        sources.insert(
+            "skills.sh".to_string(),
+            SourceTrustRule {
+                kinds: vec![CapabilityKind::Skill],
+            },
+        );
+        Self { sources }
+    }
+
+    pub fn allows_source(&self, source: &str) -> bool {
+        self.sources.contains_key(source)
+    }
+
+    pub fn allows_import(&self, source: &str, kind: CapabilityKind) -> bool {
+        self.sources
+            .get(source)
+            .is_some_and(|rule| rule.kinds.contains(&kind))
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceTrustRule {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<CapabilityKind>,
+}
+
 /// Contents of `~/.agent-matters/config.toml`. Only carries values the user
 /// chooses to set; everything else falls through to repo defaults and then
 /// runtime adapter defaults in the final precedence chain (ALP-1932).
@@ -78,6 +118,8 @@ pub struct UserConfig {
     pub instructions_output: Option<InstructionOutputDefaults>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub runtimes: BTreeMap<String, RuntimeSettings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_trust: Option<SourceTrustPolicy>,
 }
 
 #[cfg(test)]
@@ -159,6 +201,34 @@ mod tests {
                 .and_then(|output| output.markers),
             Some(InstructionMarkers::None)
         );
+    }
+
+    #[test]
+    fn source_trust_policy_default_allows_skills_sh_skill_imports() {
+        let policy = SourceTrustPolicy::conservative_default();
+
+        assert!(policy.allows_source("skills.sh"));
+        assert!(policy.allows_import("skills.sh", CapabilityKind::Skill));
+        assert!(!policy.allows_import("skills.sh", CapabilityKind::Mcp));
+        assert!(!policy.allows_source("unknown"));
+    }
+
+    #[test]
+    fn user_config_deserializes_source_trust_policy() {
+        let src = r#"
+            [source_trust.sources."skills.sh"]
+            kinds = ["skill"]
+
+            [source_trust.sources."mcp-registry"]
+            kinds = ["mcp"]
+        "#;
+
+        let parsed: UserConfig = toml::from_str(src).unwrap();
+        let policy = parsed.source_trust.expect("source trust policy");
+
+        assert!(policy.allows_import("skills.sh", CapabilityKind::Skill));
+        assert!(policy.allows_import("mcp-registry", CapabilityKind::Mcp));
+        assert!(!policy.allows_import("mcp-registry", CapabilityKind::Skill));
     }
 
     #[test]

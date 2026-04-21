@@ -2,12 +2,17 @@
 
 use std::path::PathBuf;
 
-use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
+use agent_matters_core::config::SourceTrustPolicy;
+use agent_matters_core::domain::{
+    CapabilityKind, Diagnostic, DiagnosticLocation, DiagnosticSeverity,
+};
+use serde::Serialize;
 use thiserror::Error;
 
 use crate::catalog::{
     CatalogIndexError, CatalogIndexStatus, LoadCatalogIndexRequest, load_or_refresh_catalog_index,
 };
+use crate::config::{ConfigError, load_effective_source_trust_policy};
 
 use super::{
     SkillsShAdapter, SourceAdapter, SourceAdapterError, SourceImportRequest,
@@ -30,7 +35,7 @@ pub struct ImportSourceAdapterRequest<'a, A: SourceAdapter> {
     pub adapter: &'a A,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ImportSourceResult {
     pub source: String,
     pub locator: String,
@@ -46,6 +51,10 @@ pub struct ImportSourceResult {
 pub enum ImportSourceError {
     #[error("source locator `{locator}` must use `<source>:<locator>`")]
     InvalidLocator { locator: String },
+    #[error("source `{source_id}` is blocked from importing capability kind `{kind}`")]
+    TrustBlocked { source_id: String, kind: String },
+    #[error(transparent)]
+    Config(#[from] ConfigError),
     #[error(transparent)]
     Adapter(#[from] SourceAdapterError),
     #[error(transparent)]
@@ -65,6 +74,34 @@ impl ImportSourceError {
             .with_recovery_hint(
                 "try `<source>:<locator>`, for example `skills.sh:owner/repo@skill-name`",
             ),
+            Self::TrustBlocked { source_id, kind } => Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "source.trust-blocked",
+                format!(
+                    "source `{source_id}` is blocked from importing capability kind `{kind}` by policy"
+                ),
+            )
+            .with_recovery_hint(
+                "allow this source and kind in defaults/sources.toml or user config.toml",
+            ),
+            Self::Config(ConfigError::Io { path, source }) => Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "source.config-read-failed",
+                format!(
+                    "failed to read source trust config `{}`: {source}",
+                    path.display()
+                ),
+            )
+            .with_location(DiagnosticLocation::manifest_path(path)),
+            Self::Config(ConfigError::Parse { path, source }) => Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "source.config-parse-failed",
+                format!(
+                    "failed to parse source trust config `{}`: {source}",
+                    path.display()
+                ),
+            )
+            .with_location(DiagnosticLocation::manifest_path(path)),
             Self::Adapter(source) => source.to_diagnostic(),
             Self::Storage(SourceImportStorageError::AlreadyExists { path }) => Diagnostic::new(
                 DiagnosticSeverity::Error,
@@ -94,14 +131,22 @@ pub fn import_source(
     request: ImportSourceRequest,
 ) -> Result<ImportSourceResult, ImportSourceError> {
     let (source, locator) = split_source_locator(&request.locator)?;
+    let policy = load_effective_source_trust_policy(&request.repo_root, &request.user_state_dir)?;
+    if !policy.allows_source(&source) {
+        return Err(trust_blocked(source, None));
+    }
+
     match source.as_str() {
-        "skills.sh" => import_source_from_adapter(ImportSourceAdapterRequest {
-            repo_root: request.repo_root,
-            user_state_dir: request.user_state_dir,
-            locator,
-            replace_existing: request.replace_existing,
-            adapter: &SkillsShAdapter::default(),
-        }),
+        "skills.sh" => import_source_from_adapter_with_policy(
+            ImportSourceAdapterRequest {
+                repo_root: request.repo_root,
+                user_state_dir: request.user_state_dir,
+                locator,
+                replace_existing: request.replace_existing,
+                adapter: &SkillsShAdapter::default(),
+            },
+            &policy,
+        ),
         other => Err(SourceAdapterError::import_failed(
             other,
             locator,
@@ -114,9 +159,21 @@ pub fn import_source(
 pub fn import_source_from_adapter<A: SourceAdapter>(
     request: ImportSourceAdapterRequest<'_, A>,
 ) -> Result<ImportSourceResult, ImportSourceError> {
+    import_source_from_adapter_with_policy(request, &SourceTrustPolicy::conservative_default())
+}
+
+pub fn import_source_from_adapter_with_policy<A: SourceAdapter>(
+    request: ImportSourceAdapterRequest<'_, A>,
+    policy: &SourceTrustPolicy,
+) -> Result<ImportSourceResult, ImportSourceError> {
     let imported = request.adapter.import_capability(SourceImportRequest {
         locator: request.locator,
     })?;
+    let kind = imported.manifest.kind;
+    if !policy.allows_import(&imported.source, kind) {
+        return Err(trust_blocked(imported.source, Some(kind)));
+    }
+
     let capability_id = imported.manifest.id.to_string();
     let source = imported.source.clone();
     let locator = imported.locator.clone();
@@ -142,6 +199,15 @@ pub fn import_source_from_adapter<A: SourceAdapter>(
         index_status: loaded.status,
         diagnostics,
     })
+}
+
+fn trust_blocked(source: String, kind: Option<CapabilityKind>) -> ImportSourceError {
+    ImportSourceError::TrustBlocked {
+        source_id: source,
+        kind: kind
+            .map(|kind| kind.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+    }
 }
 
 fn split_source_locator(locator: &str) -> Result<(String, String), ImportSourceError> {

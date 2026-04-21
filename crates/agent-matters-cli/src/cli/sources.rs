@@ -39,6 +39,9 @@ pub enum SourcesCmd {
         /// Source specific locator.
         #[arg(help = generated_help::SOURCES_IMPORT_LOCATOR_HELP)]
         locator: String,
+        /// Emit JSON instead of human readable output.
+        #[arg(short = 'j', long, help = generated_help::SOURCES_IMPORT_JSON_HELP)]
+        json: bool,
     },
 }
 
@@ -50,7 +53,7 @@ pub fn dispatch(cmd: SourcesCmd) -> anyhow::Result<i32> {
             query,
             json,
         } => run_search(&source, &query, json),
-        SourcesCmd::Import { locator } => run_import(&locator),
+        SourcesCmd::Import { locator, json } => run_import(&locator, json),
     }
 }
 
@@ -80,7 +83,7 @@ fn run_search(source: &str, query: &str, json: bool) -> anyhow::Result<i32> {
     }
 }
 
-fn run_import(locator: &str) -> anyhow::Result<i32> {
+fn run_import(locator: &str, json: bool) -> anyhow::Result<i32> {
     let (repo_root, user_state_dir) = default_catalog_paths()?;
     match import_source(ImportSourceRequest {
         repo_root: repo_root.clone(),
@@ -89,19 +92,28 @@ fn run_import(locator: &str) -> anyhow::Result<i32> {
         replace_existing: false,
     }) {
         Ok(result) => {
-            emit_diagnostics(&result.diagnostics);
-            println!("Imported {}", result.capability_id);
-            println!("source\t{}:{}", result.source, result.locator);
-            println!(
-                "manifest\t{}",
-                display_path(&repo_root, &result.manifest_path)
-            );
-            println!("vendor\t{}", display_path(&repo_root, &result.vendor_dir));
-            println!("index\t{}", result.index_path.display());
+            if json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                emit_diagnostics(&result.diagnostics);
+                println!("Imported {}", result.capability_id);
+                println!("source\t{}:{}", result.source, result.locator);
+                println!(
+                    "manifest\t{}",
+                    display_path(&repo_root, &result.manifest_path)
+                );
+                println!("vendor\t{}", display_path(&repo_root, &result.vendor_dir));
+                println!("index\t{}", result.index_path.display());
+            }
             Ok(0)
         }
         Err(err) => {
-            emit_diagnostics(&[err.to_diagnostic()]);
+            let diagnostic = err.to_diagnostic();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&vec![diagnostic])?);
+            } else {
+                emit_diagnostics(&[diagnostic]);
+            }
             Ok(1)
         }
     }

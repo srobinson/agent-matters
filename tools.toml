@@ -262,6 +262,12 @@ type = "string"
 required = true
 cli_help = "Source specific locator (scheme determined by the source adapter)"
 
+[[tools.sources-import.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human summary"
+
 # ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------

@@ -8,9 +8,10 @@ pub mod paths;
 pub mod schemas;
 
 pub use paths::{
-    MARKERS_FILE_NAME, REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, USER_CONFIG_DIR_NAME,
-    USER_CONFIG_FILE_NAME, expand_tilde,
+    MARKERS_FILE_NAME, REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, SOURCES_FILE_NAME,
+    USER_CONFIG_DIR_NAME, USER_CONFIG_FILE_NAME, expand_tilde,
 };
 pub use schemas::{
-    InstructionOutputDefaults, Markers, RuntimeDefaults, RuntimeSettings, UserConfig,
+    InstructionOutputDefaults, Markers, RuntimeDefaults, RuntimeSettings, SourceTrustPolicy,
+    SourceTrustRule, UserConfig,
 };

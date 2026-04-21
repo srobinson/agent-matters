@@ -11,6 +11,7 @@ use agent_matters_core::catalog::{
     RequirementSummary, RuntimeCompatibilitySummary,
 };
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity, Provenance};
+use serde::Serialize;
 
 use super::{
     CapabilityDiscoverySource, CatalogDiscovery, DiscoveredCapabilityManifest,
@@ -31,7 +32,8 @@ pub struct LoadCatalogIndexResult {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CatalogIndexStatus {
     Fresh,
     RebuiltMissing,

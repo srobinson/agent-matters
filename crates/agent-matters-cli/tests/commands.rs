@@ -100,7 +100,8 @@ fn sources_import_help_uses_generated_text_and_examples() {
         .assert()
         .success()
         .stdout(contains("preserves raw source material under `vendor`"))
-        .stdout(contains("skills.sh:owner/repo@skill-name"));
+        .stdout(contains("skills.sh:owner/repo@skill-name"))
+        .stdout(contains("--json"));
 }
 
 #[test]
@@ -454,6 +455,42 @@ fn sources_import_writes_catalog_vendor_and_index() {
             .exists()
     );
     assert!(state.path().join("indexes/catalog.json").exists());
+}
+
+#[test]
+fn sources_import_json_reports_policy_diagnostic() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+    fs::write(
+        state.path().join("config.toml"),
+        r#"
+        [source_trust.sources."skills.sh"]
+        kinds = ["mcp"]
+        "#,
+    )
+    .unwrap();
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args([
+            "sources",
+            "import",
+            "skills.sh:owner/repo@playwright",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("\"code\": \"source.trust-blocked\""))
+        .stdout(contains("skills.sh"))
+        .stdout(contains("skill"));
+
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
 }
 
 fn write_fake_skills_bin(dir: &TempDir) -> PathBuf {

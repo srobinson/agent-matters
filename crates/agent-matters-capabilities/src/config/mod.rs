@@ -5,6 +5,7 @@
 mod loader;
 
 pub use loader::{
-    ConfigError, load_markers, load_runtime_defaults, load_runtime_settings, load_user_config,
+    ConfigError, load_effective_source_trust_policy, load_markers, load_repo_source_trust_policy,
+    load_runtime_defaults, load_runtime_settings, load_user_config,
     load_user_config_from_state_dir,
 };

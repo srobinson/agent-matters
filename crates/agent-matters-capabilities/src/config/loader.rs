@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use agent_matters_core::config::{
     MARKERS_FILE_NAME, Markers, REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, RuntimeDefaults,
-    USER_CONFIG_DIR_NAME, USER_CONFIG_FILE_NAME, UserConfig,
+    SOURCES_FILE_NAME, SourceTrustPolicy, USER_CONFIG_DIR_NAME, USER_CONFIG_FILE_NAME, UserConfig,
 };
 use serde::de::DeserializeOwned;
 
@@ -62,6 +62,17 @@ pub fn load_markers(repo_root: &Path) -> Result<Markers, ConfigError> {
     load_optional_toml(&path)
 }
 
+/// Load `<repo_root>/defaults/sources.toml` into [`SourceTrustPolicy`].
+///
+/// A missing file returns the built in MVP policy: `skills.sh` may import
+/// `skill` capabilities and every other source fails closed.
+pub fn load_repo_source_trust_policy(repo_root: &Path) -> Result<SourceTrustPolicy, ConfigError> {
+    let path = repo_root
+        .join(REPO_DEFAULTS_DIR_NAME)
+        .join(SOURCES_FILE_NAME);
+    load_optional_toml_with_missing(&path, SourceTrustPolicy::conservative_default)
+}
+
 /// Load `<user_home>/.agent-matters/config.toml` into [`UserConfig`].
 pub fn load_user_config(user_home: &Path) -> Result<UserConfig, ConfigError> {
     let path = user_home
@@ -76,13 +87,32 @@ pub fn load_user_config_from_state_dir(user_state_dir: &Path) -> Result<UserConf
     load_optional_toml(&path)
 }
 
+/// Load repo source trust policy, then let user config replace it when
+/// `[source_trust]` is present in `<user_state_dir>/config.toml`.
+pub fn load_effective_source_trust_policy(
+    repo_root: &Path,
+    user_state_dir: &Path,
+) -> Result<SourceTrustPolicy, ConfigError> {
+    let repo_policy = load_repo_source_trust_policy(repo_root)?;
+    let user_config = load_user_config_from_state_dir(user_state_dir)?;
+    Ok(user_config.source_trust.unwrap_or(repo_policy))
+}
+
 fn load_optional_toml<T>(path: &Path) -> Result<T, ConfigError>
 where
     T: DeserializeOwned + Default,
 {
+    load_optional_toml_with_missing(path, T::default)
+}
+
+fn load_optional_toml_with_missing<T, F>(path: &Path, missing: F) -> Result<T, ConfigError>
+where
+    T: DeserializeOwned,
+    F: FnOnce() -> T,
+{
     let raw = match fs::read_to_string(path) {
         Ok(raw) => raw,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(T::default()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(missing()),
         Err(source) => {
             return Err(ConfigError::Io {
                 path: path.to_path_buf(),
@@ -158,6 +188,78 @@ mod tests {
             loaded.project_markers,
             vec![".git".to_string(), "Cargo.toml".to_string()]
         );
+    }
+
+    #[test]
+    fn source_trust_policy_missing_file_returns_conservative_default() {
+        let tmp = TempDir::new().unwrap();
+        let loaded = load_repo_source_trust_policy(tmp.path()).unwrap();
+
+        assert!(loaded.allows_import(
+            "skills.sh",
+            agent_matters_core::domain::CapabilityKind::Skill
+        ));
+        assert!(!loaded.allows_source("mcp-registry"));
+    }
+
+    #[test]
+    fn source_trust_policy_valid_file_populates_sources() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "defaults/sources.toml",
+            r#"
+            [sources."skills.sh"]
+            kinds = ["skill"]
+
+            [sources."mcp-registry"]
+            kinds = ["mcp"]
+            "#,
+        );
+
+        let loaded = load_repo_source_trust_policy(tmp.path()).unwrap();
+
+        assert!(loaded.allows_import(
+            "skills.sh",
+            agent_matters_core::domain::CapabilityKind::Skill
+        ));
+        assert!(loaded.allows_import(
+            "mcp-registry",
+            agent_matters_core::domain::CapabilityKind::Mcp
+        ));
+        assert!(!loaded.allows_import(
+            "mcp-registry",
+            agent_matters_core::domain::CapabilityKind::Skill
+        ));
+    }
+
+    #[test]
+    fn user_source_trust_policy_replaces_repo_policy() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "defaults/sources.toml",
+            r#"
+            [sources."skills.sh"]
+            kinds = ["skill"]
+            "#,
+        );
+        write(
+            tmp.path(),
+            "config.toml",
+            r#"
+            [source_trust.sources."mcp-registry"]
+            kinds = ["mcp"]
+            "#,
+        );
+
+        let loaded = load_effective_source_trust_policy(tmp.path(), tmp.path()).unwrap();
+
+        assert!(!loaded.allows_source("skills.sh"));
+        assert!(loaded.allows_import(
+            "mcp-registry",
+            agent_matters_core::domain::CapabilityKind::Mcp
+        ));
     }
 
     #[test]
