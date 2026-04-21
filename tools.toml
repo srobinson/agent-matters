@@ -169,7 +169,7 @@ cli_help = "Capability identifier"
 name = "json"
 type = "boolean"
 cli_flag = "json"
-cli_help = "Emit machine readable JSON instead of the unified diff"
+cli_help = "Emit machine readable JSON instead of the human diff report"
 
 # ---------------------------------------------------------------------------
 # sources

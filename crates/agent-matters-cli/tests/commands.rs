@@ -164,6 +164,20 @@ fn capabilities_list_reads_generated_index_as_json() {
 }
 
 #[test]
+fn capabilities_diff_reports_overlay_changes() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/imported-overlaid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["capabilities", "diff", "skill:playwright"])
+        .assert()
+        .success()
+        .stdout(contains("Capability overlay diff: skill:playwright"))
+        .stdout(contains("changed\tmanifest.toml"));
+}
+
+#[test]
 fn remaining_not_implemented_verbs_fail_with_clear_message() {
     bin()
         .args(["profiles", "show", "github-researcher"])

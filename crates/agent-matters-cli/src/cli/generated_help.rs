@@ -48,7 +48,7 @@ pub const CAPABILITIES_DIFF_ABOUT: &str = "Diff a capability's local overlay aga
 #[rustfmt::skip]
 pub const CAPABILITIES_DIFF_CAPABILITY_HELP: &str = "Capability identifier";
 #[rustfmt::skip]
-pub const CAPABILITIES_DIFF_JSON_HELP: &str = "Emit machine readable JSON instead of the unified diff";
+pub const CAPABILITIES_DIFF_JSON_HELP: &str = "Emit machine readable JSON instead of the human diff report";
 
 #[rustfmt::skip]
 pub const SOURCES_SEARCH_ABOUT: &str = "Search a registered source for entries matching a query.\n\nMVP sources: `skills.sh`. Additional sources (for example the MCP Registry) arrive with their adapters under ALP-1916. Returns a ranked list of locators suitable for passing to `sources import`.";
