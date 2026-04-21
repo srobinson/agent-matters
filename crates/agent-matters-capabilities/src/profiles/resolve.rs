@@ -8,6 +8,7 @@ use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSever
 use serde::Serialize;
 
 use crate::catalog::{CatalogIndexError, LoadCatalogIndexRequest, load_or_refresh_catalog_index};
+use crate::profiles::runtime::{ResolvedRuntimeConfig, resolve_runtime_configs};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolveProfileRequest {
@@ -23,6 +24,9 @@ pub struct ResolveProfileResult {
     pub record: Option<ProfileIndexRecord>,
     pub effective_capabilities: Vec<CapabilityIndexRecord>,
     pub instruction_fragments: Vec<ResolvedInstructionFragment>,
+    pub runtime_configs: Vec<ResolvedRuntimeConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_runtime: Option<String>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -45,9 +49,11 @@ pub struct ResolvedInstructionFragment {
 pub fn resolve_profile(
     request: ResolveProfileRequest,
 ) -> Result<ResolveProfileResult, CatalogIndexError> {
+    let repo_root = request.repo_root;
+    let user_state_dir = request.user_state_dir;
     let loaded = load_or_refresh_catalog_index(LoadCatalogIndexRequest {
-        repo_root: request.repo_root,
-        user_state_dir: request.user_state_dir,
+        repo_root: repo_root.clone(),
+        user_state_dir: user_state_dir.clone(),
     })?;
     let record = loaded.index.profile(&request.profile).cloned();
     let mut result = ResolveProfileResult {
@@ -55,6 +61,8 @@ pub fn resolve_profile(
         record,
         effective_capabilities: Vec::new(),
         instruction_fragments: Vec::new(),
+        runtime_configs: Vec::new(),
+        selected_runtime: None,
         diagnostics: loaded.diagnostics,
     };
 
@@ -94,6 +102,17 @@ pub fn resolve_profile(
             None => {}
         }
     }
+
+    let runtime_resolution = resolve_runtime_configs(
+        &repo_root,
+        &user_state_dir,
+        profile,
+        &result.effective_capabilities,
+        &profile_manifest_path,
+    );
+    result.runtime_configs = runtime_resolution.runtime_configs;
+    result.selected_runtime = runtime_resolution.selected_runtime;
+    result.diagnostics.extend(runtime_resolution.diagnostics);
 
     Ok(result)
 }

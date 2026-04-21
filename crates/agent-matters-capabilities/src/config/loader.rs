@@ -48,6 +48,12 @@ pub fn load_runtime_defaults(repo_root: &Path) -> Result<RuntimeDefaults, Config
     load_optional_toml(&path)
 }
 
+/// Load a runtime settings TOML file referenced by a `runtime-setting`
+/// capability. The file uses the same schema as repo runtime defaults.
+pub fn load_runtime_settings(path: &Path) -> Result<RuntimeDefaults, ConfigError> {
+    load_optional_toml(path)
+}
+
 /// Load `<repo_root>/defaults/markers.toml` into [`Markers`].
 pub fn load_markers(repo_root: &Path) -> Result<Markers, ConfigError> {
     let path = repo_root
@@ -61,6 +67,12 @@ pub fn load_user_config(user_home: &Path) -> Result<UserConfig, ConfigError> {
     let path = user_home
         .join(USER_CONFIG_DIR_NAME)
         .join(USER_CONFIG_FILE_NAME);
+    load_optional_toml(&path)
+}
+
+/// Load `<user_state_dir>/config.toml` into [`UserConfig`].
+pub fn load_user_config_from_state_dir(user_state_dir: &Path) -> Result<UserConfig, ConfigError> {
+    let path = user_state_dir.join(USER_CONFIG_FILE_NAME);
     load_optional_toml(&path)
 }
 
@@ -165,6 +177,36 @@ mod tests {
         );
         let loaded = load_user_config(tmp.path()).unwrap();
         assert_eq!(loaded.default_runtime.as_deref(), Some("claude"));
+    }
+
+    #[test]
+    fn user_config_reads_from_state_dir() {
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "config.toml", r#"default_runtime = "codex""#);
+
+        let loaded = load_user_config_from_state_dir(tmp.path()).unwrap();
+
+        assert_eq!(loaded.default_runtime.as_deref(), Some("codex"));
+    }
+
+    #[test]
+    fn runtime_settings_file_uses_runtime_defaults_schema() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "settings.toml",
+            r#"
+            [runtimes.codex]
+            model = "gpt-5.4"
+            "#,
+        );
+
+        let loaded = load_runtime_settings(&tmp.path().join("settings.toml")).unwrap();
+
+        assert_eq!(
+            loaded.runtimes.get("codex").unwrap().model.as_deref(),
+            Some("gpt-5.4")
+        );
     }
 
     #[test]

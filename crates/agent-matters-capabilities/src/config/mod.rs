@@ -4,4 +4,7 @@
 
 mod loader;
 
-pub use loader::{ConfigError, load_markers, load_runtime_defaults, load_user_config};
+pub use loader::{
+    ConfigError, load_markers, load_runtime_defaults, load_runtime_settings, load_user_config,
+    load_user_config_from_state_dir,
+};
