@@ -27,9 +27,9 @@
 cli_about = """
 List profiles discovered in the local catalog.
 
-Each profile line shows the profile id, its source (repo or user), and the \
-runtimes it declares support for. Use `profiles show` to inspect a single \
-profile in detail.
+Each profile line shows the profile id, kind, enabled runtimes, scope \
+enforcement, and summary. Use `profiles show` to inspect a single profile \
+in detail.
 """
 
 [[tools.profiles-list.params]]

@@ -151,6 +151,75 @@ fn profiles_list_reads_generated_index() {
 }
 
 #[test]
+fn profiles_list_human_includes_scope_and_summary() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["profiles", "list"])
+        .assert()
+        .success()
+        .stdout(contains(
+            "github-researcher\tpersona\tcodex\tnone\tFocused research agent for inspecting GitHub repositories.",
+        ));
+}
+
+#[test]
+fn profiles_show_renders_resolution_details() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["profiles", "show", "github-researcher"])
+        .assert()
+        .success()
+        .stdout(contains("Profile: github-researcher"))
+        .stdout(contains("resolved capabilities:"))
+        .stdout(contains(
+            "skill:playwright\tskill\tcodex\tcatalog/skills/renamed-skill-dir",
+        ))
+        .stdout(contains("ordered instructions:"))
+        .stdout(contains(
+            "instruction:helioy-core\tinstruction\tcatalog/instructions/helioy-core",
+        ))
+        .stdout(contains("resolved runtime config:"))
+        .stdout(contains("codex selected"));
+}
+
+#[test]
+fn profiles_show_json_includes_resolution_details() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["profiles", "show", "github-researcher", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"profile\": \"github-researcher\""))
+        .stdout(contains("\"effective_capabilities\""))
+        .stdout(contains("\"instruction_fragments\""))
+        .stdout(contains("\"selected_runtime\": \"codex\""));
+}
+
+#[test]
+fn profiles_show_missing_id_exits_with_actionable_error() {
+    let state = TempDir::new().unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["profiles", "show", "missing-profile"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(contains("profile.resolve-not-found"))
+        .stderr(contains("exact profile ids"));
+}
+
+#[test]
 fn capabilities_list_reads_generated_index_as_json() {
     let state = TempDir::new().unwrap();
 
@@ -241,7 +310,20 @@ fn capabilities_diff_reports_overlay_changes() {
 #[test]
 fn remaining_not_implemented_verbs_fail_with_clear_message() {
     bin()
-        .args(["profiles", "show", "github-researcher"])
+        .args([
+            "profiles",
+            "compile",
+            "github-researcher",
+            "--runtime",
+            "codex",
+        ])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(contains("not yet implemented"));
+
+    bin()
+        .args(["profiles", "use", "github-researcher", "--runtime", "codex"])
         .assert()
         .failure()
         .code(1)

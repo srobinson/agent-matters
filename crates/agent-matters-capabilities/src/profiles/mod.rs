@@ -6,6 +6,7 @@ mod resolve;
 mod runtime;
 mod scope;
 mod scope_git;
+mod show;
 
 pub use list::{ListProfilesRequest, ListProfilesResult, list_profiles};
 pub use requirements::{
@@ -21,3 +22,4 @@ pub use scope::{
     ProfileScopeValidationStatus, ProfileUseScopeValidationRequest, validate_profile_scope,
     validate_profile_use_scope,
 };
+pub use show::{ShowProfileRequest, ShowProfileResult, show_profile};

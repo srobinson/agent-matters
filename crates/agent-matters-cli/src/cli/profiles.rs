@@ -5,13 +5,13 @@
 
 use std::path::PathBuf;
 
-use agent_matters_capabilities::profiles::{ListProfilesRequest, list_profiles};
+use agent_matters_capabilities::profiles::{
+    ListProfilesRequest, ShowProfileRequest, list_profiles, show_profile,
+};
 use clap::Subcommand;
 
-use super::{
-    Runtime, default_catalog_paths, emit_diagnostics, generated_help, help_text,
-    render_runtime_names,
-};
+use super::profile_render::{render_profile_list, render_profile_show};
+use super::{Runtime, default_catalog_paths, emit_diagnostics, generated_help, help_text};
 
 /// Verbs for `agent-matters profiles`.
 #[derive(Debug, Subcommand)]
@@ -98,22 +98,28 @@ fn run_list(json: bool) -> anyhow::Result<i32> {
     } else if result.profiles.is_empty() {
         println!("No profiles found.");
     } else {
-        for profile in result.profiles {
-            println!(
-                "{}\t{}\t{}\t{}",
-                profile.id,
-                profile.kind,
-                render_runtime_names(&profile.runtimes),
-                profile.source_path
-            );
-        }
+        render_profile_list(result.profiles);
     }
 
     Ok(0)
 }
 
-fn run_show(_profile: &str, _json: bool) -> anyhow::Result<i32> {
-    anyhow::bail!("profiles show: not yet implemented (ALP-1942)")
+fn run_show(profile: &str, json: bool) -> anyhow::Result<i32> {
+    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let result = show_profile(ShowProfileRequest {
+        repo_root,
+        user_state_dir,
+        profile: profile.to_string(),
+    })?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        emit_diagnostics(&result.diagnostics);
+        render_profile_show(&result);
+    }
+
+    Ok(if result.has_error_diagnostics() { 1 } else { 0 })
 }
 
 fn run_compile(_profile: &str, _runtime: Runtime) -> anyhow::Result<i32> {

@@ -22,6 +22,7 @@ pub mod capabilities;
 pub mod doctor;
 pub mod generated_help;
 pub mod help_text;
+mod profile_render;
 pub mod profiles;
 pub mod sources;
 

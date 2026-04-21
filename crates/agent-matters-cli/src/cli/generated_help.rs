@@ -4,7 +4,7 @@
 #![allow(clippy::all)]
 
 #[rustfmt::skip]
-pub const PROFILES_LIST_ABOUT: &str = "List profiles discovered in the local catalog.\n\nEach profile line shows the profile id, its source (repo or user), and the runtimes it declares support for. Use `profiles show` to inspect a single profile in detail.";
+pub const PROFILES_LIST_ABOUT: &str = "List profiles discovered in the local catalog.\n\nEach profile line shows the profile id, kind, enabled runtimes, scope enforcement, and summary. Use `profiles show` to inspect a single profile in detail.";
 #[rustfmt::skip]
 pub const PROFILES_LIST_JSON_HELP: &str = "Emit machine readable JSON instead of the human table";
 
