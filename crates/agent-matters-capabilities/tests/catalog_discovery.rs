@@ -1,7 +1,10 @@
 mod support;
 
+use std::fs;
+
 use agent_matters_capabilities::catalog::{CapabilityDiscoverySource, discover_catalog};
 use agent_matters_core::domain::{CapabilityKind, Diagnostic, DiagnosticSeverity};
+use tempfile::TempDir;
 
 use support::fixture_path;
 
@@ -223,4 +226,58 @@ fn invalid_overlay_manifest_is_reported() {
         discovery.capabilities[0].manifest.summary,
         "Upstream Playwright skill."
     );
+}
+
+#[test]
+fn duplicate_overlays_are_reported_without_selecting_one() {
+    let repo = TempDir::new().unwrap();
+    let catalog_dir = repo.path().join("catalog/skills/playwright");
+    let first_overlay_dir = repo.path().join("overlays/skills/first");
+    let second_overlay_dir = repo.path().join("overlays/skills/second");
+    fs::create_dir_all(&catalog_dir).unwrap();
+    fs::create_dir_all(&first_overlay_dir).unwrap();
+    fs::create_dir_all(&second_overlay_dir).unwrap();
+
+    fs::write(
+        catalog_dir.join("manifest.toml"),
+        capability_manifest("Upstream Playwright skill."),
+    )
+    .unwrap();
+    fs::write(
+        first_overlay_dir.join("manifest.toml"),
+        capability_manifest("First Playwright overlay."),
+    )
+    .unwrap();
+    fs::write(
+        second_overlay_dir.join("manifest.toml"),
+        capability_manifest("Second Playwright overlay."),
+    )
+    .unwrap();
+
+    let discovery = discover_catalog(repo.path());
+
+    assert_eq!(discovery.capabilities.len(), 1);
+    assert_eq!(
+        discovery.capabilities[0].manifest.summary,
+        "Upstream Playwright skill."
+    );
+    assert!(has_code(
+        &discovery.diagnostics,
+        "catalog.overlay-duplicate"
+    ));
+}
+
+fn capability_manifest(summary: &str) -> String {
+    format!(
+        r#"id = "skill:playwright"
+kind = "skill"
+summary = "{summary}"
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true
+"#
+    )
 }

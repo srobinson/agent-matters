@@ -1,5 +1,6 @@
 //! Full copy overlay resolution for discovered capability manifests.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use agent_matters_core::catalog::{
@@ -16,8 +17,15 @@ use super::discovery::{
     vendor_record_path,
 };
 
+struct OverlayCandidate {
+    manifest: CapabilityManifest,
+    manifest_path: PathBuf,
+    directory_path: PathBuf,
+}
+
 pub(super) fn discover_overlays(repo_root: &Path, discovery: &mut CatalogDiscovery) {
     report_unknown_overlay_dirs(repo_root, &mut discovery.diagnostics);
+    let mut overlays = BTreeMap::<String, Vec<OverlayCandidate>>::new();
 
     for kind in CapabilityKind::all() {
         let root = repo_root
@@ -41,7 +49,14 @@ pub(super) fn discover_overlays(repo_root: &Path, discovery: &mut CatalogDiscove
                         &manifest_path,
                         &mut discovery.diagnostics,
                     );
-                    apply_overlay(repo_root, manifest, manifest_path, path, discovery);
+                    overlays
+                        .entry(manifest.id.to_string())
+                        .or_default()
+                        .push(OverlayCandidate {
+                            manifest,
+                            manifest_path,
+                            directory_path: path,
+                        });
                 }
                 None if !manifest_path.exists() => report_missing_manifest(
                     &manifest_path,
@@ -52,6 +67,8 @@ pub(super) fn discover_overlays(repo_root: &Path, discovery: &mut CatalogDiscove
             }
         }
     }
+
+    apply_overlays(repo_root, overlays, discovery);
 }
 
 fn report_unknown_overlay_dirs(repo_root: &Path, diagnostics: &mut Vec<Diagnostic>) {
@@ -85,47 +102,78 @@ fn report_unknown_overlay_dirs(repo_root: &Path, diagnostics: &mut Vec<Diagnosti
     }
 }
 
-fn apply_overlay(
+fn apply_overlays(
     repo_root: &Path,
-    manifest: CapabilityManifest,
-    manifest_path: PathBuf,
-    directory_path: PathBuf,
+    overlays: BTreeMap<String, Vec<OverlayCandidate>>,
     discovery: &mut CatalogDiscovery,
 ) {
-    let id = manifest.id.to_string();
-    let matches: Vec<usize> = discovery
-        .capabilities
-        .iter()
-        .enumerate()
-        .filter_map(|(index, entry)| (entry.manifest.id == manifest.id).then_some(index))
-        .collect();
+    for (id, candidates) in overlays {
+        let matches: Vec<usize> = discovery
+            .capabilities
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| (entry.manifest.id.to_string() == id).then_some(index))
+            .collect();
 
-    match matches.as_slice() {
-        [] => discovery
-            .diagnostics
-            .push(overlay_target_missing_diagnostic(&id, &manifest_path)),
-        [index] => {
-            let target = discovery.capabilities[*index].clone();
-            discovery.capabilities[*index] = DiscoveredCapabilityManifest {
-                source: CapabilityDiscoverySource::Overlay {
-                    target_manifest_path: target.manifest_path,
-                    target_directory_path: target.directory_path,
-                    target_origin: target.manifest.origin.clone(),
-                    vendor_path: target
-                        .manifest
-                        .origin
-                        .as_ref()
-                        .and_then(|origin| vendor_record_path(repo_root, origin)),
-                },
-                manifest,
-                manifest_path,
-                directory_path,
-            };
+        match matches.as_slice() {
+            [] => {
+                for candidate in candidates {
+                    discovery
+                        .diagnostics
+                        .push(overlay_target_missing_diagnostic(
+                            &id,
+                            &candidate.manifest_path,
+                        ));
+                }
+            }
+            [_] if candidates.len() > 1 => {
+                for candidate in candidates {
+                    discovery
+                        .diagnostics
+                        .push(overlay_duplicate_diagnostic(&id, &candidate.manifest_path));
+                }
+            }
+            [index] => {
+                if let Some(candidate) = candidates.into_iter().next() {
+                    apply_overlay(repo_root, candidate, *index, discovery);
+                }
+            }
+            _ => {
+                for candidate in candidates {
+                    discovery
+                        .diagnostics
+                        .push(overlay_target_ambiguous_diagnostic(
+                            &id,
+                            &candidate.manifest_path,
+                        ));
+                }
+            }
         }
-        _ => discovery
-            .diagnostics
-            .push(overlay_target_ambiguous_diagnostic(&id, &manifest_path)),
     }
+}
+
+fn apply_overlay(
+    repo_root: &Path,
+    candidate: OverlayCandidate,
+    target_index: usize,
+    discovery: &mut CatalogDiscovery,
+) {
+    let target = discovery.capabilities[target_index].clone();
+    discovery.capabilities[target_index] = DiscoveredCapabilityManifest {
+        source: CapabilityDiscoverySource::Overlay {
+            target_manifest_path: target.manifest_path,
+            target_directory_path: target.directory_path,
+            target_origin: target.manifest.origin.clone(),
+            vendor_path: target
+                .manifest
+                .origin
+                .as_ref()
+                .and_then(|origin| vendor_record_path(repo_root, origin)),
+        },
+        manifest: candidate.manifest,
+        manifest_path: candidate.manifest_path,
+        directory_path: candidate.directory_path,
+    };
 }
 
 fn overlay_target_missing_diagnostic(id: &str, overlay_path: &Path) -> Diagnostic {
@@ -136,6 +184,16 @@ fn overlay_target_missing_diagnostic(id: &str, overlay_path: &Path) -> Diagnosti
     )
     .with_location(DiagnosticLocation::manifest_field(overlay_path, "id"))
     .with_recovery_hint("add the target capability under catalog before overlaying it")
+}
+
+fn overlay_duplicate_diagnostic(id: &str, overlay_path: &Path) -> Diagnostic {
+    Diagnostic::new(
+        DiagnosticSeverity::Error,
+        "catalog.overlay-duplicate",
+        format!("multiple overlays match capability `{id}`"),
+    )
+    .with_location(DiagnosticLocation::manifest_field(overlay_path, "id"))
+    .with_recovery_hint("keep only one overlay directory for each capability id")
 }
 
 fn overlay_target_ambiguous_diagnostic(id: &str, overlay_path: &Path) -> Diagnostic {
