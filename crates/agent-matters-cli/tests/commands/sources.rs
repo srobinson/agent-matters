@@ -59,10 +59,28 @@ fn sources_import_writes_catalog_vendor_and_index() {
         .assert()
         .success()
         .stdout(contains("Imported skill:playwright"))
-        .stdout(contains(
-            "manifest\tcatalog/skills/playwright/manifest.toml",
-        ))
-        .stdout(contains("vendor\tvendor/skills.sh/owner/repo@playwright"));
+        .stdout(contains(format!(
+            "catalog-root\t{}",
+            state.path().join("catalog").display()
+        )))
+        .stdout(contains(format!(
+            "manifest\t{}",
+            state
+                .path()
+                .join("catalog/skills/playwright/manifest.toml")
+                .display()
+        )))
+        .stdout(contains(format!(
+            "vendor\t{}",
+            state
+                .path()
+                .join("vendor/skills.sh/owner/repo@playwright")
+                .display()
+        )))
+        .stdout(contains(format!(
+            "index\t{}",
+            state.path().join("indexes/catalog.json").display()
+        )));
 
     assert!(
         state
@@ -98,10 +116,26 @@ fn sources_import_defaults_to_managed_home_without_touching_cwd() {
         .assert()
         .success()
         .stdout(contains("Imported skill:playwright"))
-        .stdout(contains(
-            "manifest\tcatalog/skills/playwright/manifest.toml",
-        ))
-        .stdout(contains("vendor\tvendor/skills.sh/owner/repo@playwright"));
+        .stdout(contains(format!(
+            "catalog-root\t{}",
+            managed_root.join("catalog").display()
+        )))
+        .stdout(contains(format!(
+            "manifest\t{}",
+            managed_root
+                .join("catalog/skills/playwright/manifest.toml")
+                .display()
+        )))
+        .stdout(contains(format!(
+            "vendor\t{}",
+            managed_root
+                .join("vendor/skills.sh/owner/repo@playwright")
+                .display()
+        )))
+        .stdout(contains(format!(
+            "index\t{}",
+            managed_root.join("indexes/catalog.json").display()
+        )));
 
     assert!(
         managed_root

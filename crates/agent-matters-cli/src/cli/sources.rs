@@ -2,11 +2,10 @@
 //!
 //! The CLI stays a thin adapter over the source search and import use cases.
 
-use std::path::Path;
-
 use agent_matters_capabilities::sources::{
     ImportSourceRequest, ImportSourceStatus, SearchSourceRequest, import_source, search_source,
 };
+use agent_matters_core::catalog::CATALOG_DIR_NAME;
 use agent_matters_core::domain::DiagnosticReport;
 use clap::Subcommand;
 
@@ -115,10 +114,11 @@ fn run_import(locator: &str, json: bool, update: bool) -> anyhow::Result<i32> {
                 );
                 println!("source\t{}:{}", result.source, result.locator);
                 println!(
-                    "manifest\t{}",
-                    display_path(&repo_root, &result.manifest_path)
+                    "catalog-root\t{}",
+                    repo_root.join(CATALOG_DIR_NAME).display()
                 );
-                println!("vendor\t{}", display_path(&repo_root, &result.vendor_dir));
+                println!("manifest\t{}", result.manifest_path.display());
+                println!("vendor\t{}", result.vendor_dir.display());
                 println!("index\t{}", result.index_path.display());
             }
             Ok(0)
@@ -164,11 +164,4 @@ fn render_search(result: &agent_matters_capabilities::sources::SourceSearchResul
             entry.summary.as_deref().unwrap_or("-")
         );
     }
-}
-
-fn display_path(repo_root: &Path, path: &Path) -> String {
-    path.strip_prefix(repo_root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string()
 }
