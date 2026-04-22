@@ -124,6 +124,9 @@ pub fn validate_profile_scope(
 
     if !scope.has_allowed_targets() {
         result.status = ProfileScopeValidationStatus::Unrestricted;
+        if let Some(diagnostic) = missing_scope_targets(&result.profile, &scope, &manifest_path) {
+            result.diagnostics.push(diagnostic);
+        }
         return result;
     }
 
@@ -255,6 +258,33 @@ fn path_missing(
     )
     .with_location(DiagnosticLocation::field("path"))
     .with_recovery_hint("create the path or pass an existing workspace path")
+}
+
+fn missing_scope_targets(
+    profile: &str,
+    scope: &ScopeConstraints,
+    manifest_path: &Path,
+) -> Option<Diagnostic> {
+    let severity = match scope.enforcement {
+        ScopeEnforcement::Warn => DiagnosticSeverity::Warning,
+        ScopeEnforcement::Fail => DiagnosticSeverity::Error,
+        ScopeEnforcement::None => return None,
+    };
+
+    Some(
+        Diagnostic::new(
+            severity,
+            "profile.scope.missing-targets",
+            format!(
+                "profile `{profile}` declares scope enforcement `{}` without any allowed targets in `paths` or `github_repos`",
+                scope.enforcement
+            ),
+        )
+        .with_location(DiagnosticLocation::manifest_field(manifest_path, "scope"))
+        .with_recovery_hint(
+            "add at least one scope path or GitHub repository, or set enforcement to none",
+        ),
+    )
 }
 
 fn allowed_scope_text(scope: &ScopeConstraints) -> String {

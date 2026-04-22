@@ -155,6 +155,21 @@ fn use_profile_scope_fail_blocks_out_of_scope_path() {
 }
 
 #[test]
+fn use_profile_scope_fail_without_targets_blocks_build() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    append_profile_scope(repo.path(), "[scope]\nenforcement = \"fail\"\n");
+
+    let result = use_profile(use_request(repo.path(), state.path(), workspace.path())).unwrap();
+
+    assert!(result.build.is_none());
+    assert!(result.has_error_diagnostics());
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+    assert_eq!(result.diagnostics[0].code, "profile.scope.missing-targets");
+}
+
+#[test]
 fn use_profile_ambiguous_runtime_fails_without_flag() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();

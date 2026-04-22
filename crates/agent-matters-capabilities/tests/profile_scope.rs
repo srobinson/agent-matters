@@ -66,6 +66,71 @@ fn validate(
 }
 
 #[test]
+fn omitted_scope_without_targets_remains_unrestricted() {
+    let repo = valid_repo();
+
+    let result = validate(&repo, repo.path());
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::Unrestricted);
+    assert_eq!(result.diagnostics, Vec::new());
+}
+
+#[test]
+fn scope_enforcement_none_without_targets_remains_unrestricted() {
+    let repo = valid_repo();
+    set_scope(
+        &repo,
+        r#"enforcement = "none"
+"#,
+    );
+
+    let result = validate(&repo, repo.path());
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::Unrestricted);
+    assert_eq!(result.diagnostics, Vec::new());
+}
+
+#[test]
+fn scope_enforcement_warn_without_targets_reports_warning() {
+    let repo = valid_repo();
+    set_scope(
+        &repo,
+        r#"enforcement = "warn"
+"#,
+    );
+
+    let result = validate(&repo, repo.path());
+    let diagnostic = result.diagnostics.first().unwrap();
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::Unrestricted);
+    assert!(!result.has_error_diagnostics());
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Warning);
+    assert_eq!(diagnostic.code, "profile.scope.missing-targets");
+    assert!(diagnostic.message.contains("paths"));
+    assert!(diagnostic.message.contains("github_repos"));
+}
+
+#[test]
+fn scope_enforcement_fail_without_targets_reports_error() {
+    let repo = valid_repo();
+    set_scope(
+        &repo,
+        r#"enforcement = "fail"
+"#,
+    );
+
+    let result = validate(&repo, repo.path());
+    let diagnostic = result.diagnostics.first().unwrap();
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::Unrestricted);
+    assert!(result.has_error_diagnostics());
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert_eq!(diagnostic.code, "profile.scope.missing-targets");
+    assert!(diagnostic.message.contains("paths"));
+    assert!(diagnostic.message.contains("github_repos"));
+}
+
+#[test]
 fn path_in_scope_passes() {
     let repo = valid_repo();
     let allowed = repo.path().join("allowed");
