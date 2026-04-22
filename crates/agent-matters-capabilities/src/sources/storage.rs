@@ -27,6 +27,15 @@ pub struct WriteSourceImportResult {
     pub diagnostics: Vec<agent_matters_core::domain::Diagnostic>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImportTreePaths {
+    capability_dir: PathBuf,
+    manifest_path: PathBuf,
+    vendor_dir: PathBuf,
+    catalog_files: Vec<PathBuf>,
+    vendor_files: Vec<PathBuf>,
+}
+
 #[derive(Debug, Error)]
 pub enum SourceImportStorageError {
     #[error("import manifest for `{capability}` must include external or derived provenance")]
@@ -66,6 +75,19 @@ pub enum SourceImportStorageError {
         #[source]
         source: io::Error,
     },
+    #[error("failed to publish source import path `{from}` to `{to}`: {source}")]
+    PublishPath {
+        from: PathBuf,
+        to: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error("failed to remove source import path `{path}`: {source}")]
+    RemovePath {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 pub fn write_source_import(
@@ -90,14 +112,18 @@ pub fn write_source_import(
         &request.import.locator,
     )?;
 
+    let final_paths = import_tree_paths(
+        capability_dir,
+        vendor_dir,
+        &request.import.catalog_files,
+        &request.import.vendor_files,
+    )?;
+
     if !request.replace_existing {
-        reject_existing(&capability_dir)?;
-        reject_existing(&vendor_dir)?;
+        reject_existing(&final_paths.capability_dir)?;
+        reject_existing(&final_paths.vendor_dir)?;
     }
 
-    let manifest_path = capability_dir.join(MANIFEST_FILE_NAME);
-    let catalog_files = validate_file_set(&capability_dir, &request.import.catalog_files, true)?;
-    let vendor_files = validate_file_set(&vendor_dir, &request.import.vendor_files, false)?;
     let manifest = toml::to_string_pretty(&request.import.manifest).map_err(|source| {
         SourceImportStorageError::SerializeManifest {
             capability: request.import.manifest.id.to_string(),
@@ -105,18 +131,34 @@ pub fn write_source_import(
         }
     })?;
 
-    create_dir_all(&capability_dir)?;
-    create_dir_all(&vendor_dir)?;
-    write_file(&manifest_path, &manifest)?;
-    write_file_set(&request.import.catalog_files, &catalog_files)?;
-    write_file_set(&request.import.vendor_files, &vendor_files)?;
+    let staging_paths = import_tree_paths(
+        temp_sibling(&final_paths.capability_dir, "source-import"),
+        temp_sibling(&final_paths.vendor_dir, "source-import"),
+        &request.import.catalog_files,
+        &request.import.vendor_files,
+    )?;
+    remove_path_if_exists(&staging_paths.capability_dir)?;
+    remove_path_if_exists(&staging_paths.vendor_dir)?;
+
+    let write_result = write_staged_import(&request.import, &manifest, &staging_paths);
+    if let Err(source) = write_result {
+        cleanup_staging(&staging_paths);
+        return Err(source);
+    }
+
+    let publish_result =
+        publish_staged_import(&staging_paths, &final_paths, request.replace_existing);
+    if let Err(source) = publish_result {
+        cleanup_staging(&staging_paths);
+        return Err(source);
+    }
 
     Ok(WriteSourceImportResult {
-        capability_dir,
-        manifest_path,
-        vendor_dir,
-        catalog_files,
-        vendor_files,
+        capability_dir: final_paths.capability_dir,
+        manifest_path: final_paths.manifest_path,
+        vendor_dir: final_paths.vendor_dir,
+        catalog_files: final_paths.catalog_files,
+        vendor_files: final_paths.vendor_files,
         diagnostics: request.import.diagnostics,
     })
 }
@@ -183,6 +225,25 @@ fn validate_file_set(
         .collect()
 }
 
+fn import_tree_paths(
+    capability_dir: PathBuf,
+    vendor_dir: PathBuf,
+    catalog_files: &[SourceImportFile],
+    vendor_files: &[SourceImportFile],
+) -> Result<ImportTreePaths, SourceImportStorageError> {
+    let manifest_path = capability_dir.join(MANIFEST_FILE_NAME);
+    let catalog_files = validate_file_set(&capability_dir, catalog_files, true)?;
+    let vendor_files = validate_file_set(&vendor_dir, vendor_files, false)?;
+
+    Ok(ImportTreePaths {
+        capability_dir,
+        manifest_path,
+        vendor_dir,
+        catalog_files,
+        vendor_files,
+    })
+}
+
 fn validated_vendor_dir(
     repo_root: &Path,
     source: &str,
@@ -210,6 +271,44 @@ fn write_file_set(
         write_file(path, &file.contents)?;
     }
     Ok(())
+}
+
+fn write_staged_import(
+    import: &SourceImportResult,
+    manifest: &str,
+    paths: &ImportTreePaths,
+) -> Result<(), SourceImportStorageError> {
+    create_dir_all(&paths.capability_dir)?;
+    create_dir_all(&paths.vendor_dir)?;
+    write_file(&paths.manifest_path, manifest)?;
+    write_file_set(&import.catalog_files, &paths.catalog_files)?;
+    write_file_set(&import.vendor_files, &paths.vendor_files)?;
+    Ok(())
+}
+
+fn publish_staged_import(
+    staging_paths: &ImportTreePaths,
+    final_paths: &ImportTreePaths,
+    replace_existing: bool,
+) -> Result<(), SourceImportStorageError> {
+    if replace_existing {
+        remove_path_if_exists(&final_paths.capability_dir)?;
+        remove_path_if_exists(&final_paths.vendor_dir)?;
+    }
+
+    publish_path(&staging_paths.capability_dir, &final_paths.capability_dir)?;
+    match publish_path(&staging_paths.vendor_dir, &final_paths.vendor_dir) {
+        Ok(()) => Ok(()),
+        Err(source) => {
+            let _ = remove_path_if_exists(&final_paths.capability_dir);
+            Err(source)
+        }
+    }
+}
+
+fn cleanup_staging(paths: &ImportTreePaths) {
+    let _ = remove_path_if_exists(&paths.capability_dir);
+    let _ = remove_path_if_exists(&paths.vendor_dir);
 }
 
 fn validated_child_path(base: &Path, relative: &Path) -> Result<PathBuf, SourceImportStorageError> {
@@ -247,4 +346,43 @@ fn write_file(path: &Path, contents: &str) -> Result<(), SourceImportStorageErro
         path: path.to_path_buf(),
         source,
     })
+}
+
+fn publish_path(from: &Path, to: &Path) -> Result<(), SourceImportStorageError> {
+    fs::rename(from, to).map_err(|source| SourceImportStorageError::PublishPath {
+        from: from.to_path_buf(),
+        to: to.to_path_buf(),
+        source,
+    })
+}
+
+fn remove_path_if_exists(path: &Path) -> Result<(), SourceImportStorageError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(source) => {
+            return Err(SourceImportStorageError::RemovePath {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+
+    let result = if metadata.is_dir() && !metadata.file_type().is_symlink() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+    result.map_err(|source| SourceImportStorageError::RemovePath {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn temp_sibling(path: &Path, label: &str) -> PathBuf {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("source-import");
+    path.with_file_name(format!(".{name}.{label}.tmp-{}", std::process::id()))
 }

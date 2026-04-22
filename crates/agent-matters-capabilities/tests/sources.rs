@@ -228,6 +228,66 @@ fn raw_plus_normalized_storage_contract_writes_catalog_and_vendor() {
 }
 
 #[test]
+fn import_storage_stages_writes_so_mid_write_failure_is_retryable() {
+    let repo = TempDir::new().unwrap();
+    let adapter = FakeSourceAdapter;
+    let mut import = adapter
+        .import_capability(SourceImportRequest {
+            locator: "playwright".to_string(),
+        })
+        .unwrap();
+    import.catalog_files = vec![
+        SourceImportFile {
+            relative_path: PathBuf::from("blocked"),
+            contents: "file first\n".to_string(),
+        },
+        SourceImportFile {
+            relative_path: PathBuf::from("blocked/child.md"),
+            contents: "then fail\n".to_string(),
+        },
+    ];
+
+    let err = write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import,
+        replace_existing: false,
+    })
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        SourceImportStorageError::CreateDirectory { .. }
+    ));
+    assert!(!repo.path().join("catalog/skills/playwright").exists());
+    assert!(!repo.path().join("vendor/skills.sh/playwright").exists());
+    assert_empty_or_missing(&repo.path().join("catalog/skills"));
+    assert_empty_or_missing(&repo.path().join("vendor/skills.sh"));
+
+    let retry_import = adapter
+        .import_capability(SourceImportRequest {
+            locator: "playwright".to_string(),
+        })
+        .unwrap();
+    write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: retry_import,
+        replace_existing: false,
+    })
+    .unwrap();
+
+    assert!(
+        repo.path()
+            .join("catalog/skills/playwright/manifest.toml")
+            .exists()
+    );
+    assert!(
+        repo.path()
+            .join("vendor/skills.sh/playwright/record.json")
+            .exists()
+    );
+}
+
+#[test]
 fn source_adapter_error_maps_to_source_diagnostic() {
     let diagnostic =
         SourceAdapterError::import_failed("skills.sh", "missing", "upstream command exited 1")
@@ -414,5 +474,11 @@ fn fake_manifest(locator: &str) -> CapabilityManifest {
             locator,
             Some("1.0.0".to_string()),
         )),
+    }
+}
+
+fn assert_empty_or_missing(path: &std::path::Path) {
+    if path.exists() {
+        assert!(fs::read_dir(path).unwrap().next().is_none());
     }
 }
