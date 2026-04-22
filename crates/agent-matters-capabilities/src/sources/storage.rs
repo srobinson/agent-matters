@@ -1,5 +1,6 @@
 mod error;
 mod fs;
+mod partial;
 mod paths;
 mod provenance;
 mod publish;
@@ -11,7 +12,9 @@ use agent_matters_core::catalog::{CATALOG_DIR_NAME, capability_kind_dir_name};
 
 use super::contract::SourceImportResult;
 pub use error::SourceImportStorageError;
-use paths::{import_tree_paths, reject_existing, temp_sibling, validated_vendor_dir};
+use paths::{
+    import_tree_paths, reject_complete_existing_import, temp_sibling, validated_vendor_dir,
+};
 use provenance::validate_provenance;
 use publish::publish_staged_import;
 use staging::{cleanup_staging, prepare_staging, write_staged_import};
@@ -63,8 +66,7 @@ pub fn write_source_import(
     )?;
 
     if !request.replace_existing {
-        reject_existing(&final_paths.capability_dir)?;
-        reject_existing(&final_paths.vendor_dir)?;
+        reject_complete_existing_import(&final_paths)?;
     }
 
     let manifest = toml::to_string_pretty(&request.import.manifest).map_err(|source| {

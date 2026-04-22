@@ -4,6 +4,7 @@ use agent_matters_core::catalog::{MANIFEST_FILE_NAME, VENDOR_DIR_NAME};
 
 use super::super::contract::SourceImportFile;
 use super::SourceImportStorageError;
+use super::fs::path_exists;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ImportTreePaths {
@@ -14,10 +15,12 @@ pub(super) struct ImportTreePaths {
     pub(super) vendor_files: Vec<PathBuf>,
 }
 
-pub(super) fn reject_existing(path: &Path) -> Result<(), SourceImportStorageError> {
-    if path.exists() {
+pub(super) fn reject_complete_existing_import(
+    paths: &ImportTreePaths,
+) -> Result<(), SourceImportStorageError> {
+    if path_exists(&paths.capability_dir)? && path_exists(&paths.vendor_dir)? {
         return Err(SourceImportStorageError::AlreadyExists {
-            path: path.to_path_buf(),
+            path: paths.capability_dir.clone(),
         });
     }
     Ok(())

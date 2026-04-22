@@ -20,6 +20,10 @@ pub enum SourceImportStorageError {
     MissingVendorRecord { source_id: String, locator: String },
     #[error("refusing to replace existing import path `{path}`")]
     AlreadyExists { path: PathBuf },
+    #[error(
+        "source import is partially published: `{existing}` exists but `{missing}` is missing and staged contents do not match"
+    )]
+    PartialPublishConflict { existing: PathBuf, missing: PathBuf },
     #[error("relative import path `{path}` must stay inside its target directory")]
     InvalidRelativePath { path: PathBuf },
     #[error("source import file path `{path}` is reserved for generated metadata")]
@@ -46,6 +50,12 @@ pub enum SourceImportStorageError {
     PublishPath {
         from: PathBuf,
         to: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error("failed to inspect source import path `{path}`: {source}")]
+    InspectPath {
+        path: PathBuf,
         #[source]
         source: io::Error,
     },

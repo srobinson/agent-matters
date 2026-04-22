@@ -111,6 +111,21 @@ impl ImportSourceError {
             .with_recovery_hint(
                 "remove the existing local capability or choose a different source locator",
             ),
+            Self::Storage(SourceImportStorageError::PartialPublishConflict {
+                existing,
+                missing,
+            }) => Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "source.import-repair-needed",
+                format!(
+                    "source import is partially published: `{}` exists but `{}` is missing and does not match the staged import",
+                    existing.display(),
+                    missing.display()
+                ),
+            )
+            .with_recovery_hint(
+                "inspect the partial import, then remove it or retry with replace existing",
+            ),
             Self::Storage(source) => Diagnostic::new(
                 DiagnosticSeverity::Error,
                 "source.import-write-failed",

@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use super::SourceImportStorageError;
-use super::fs::{move_path_if_exists, publish_path, remove_path_if_exists};
+use super::fs::{move_path_if_exists, path_exists, publish_path, remove_path_if_exists};
+use super::partial::{PublishedTree, complete_partial_new_import};
 use super::paths::{ImportTreePaths, temp_sibling};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +24,27 @@ pub(super) fn publish_staged_import(
 }
 
 fn publish_new_staged_import(
+    staging_paths: &ImportTreePaths,
+    final_paths: &ImportTreePaths,
+) -> Result<(), SourceImportStorageError> {
+    match (
+        path_exists(&final_paths.capability_dir)?,
+        path_exists(&final_paths.vendor_dir)?,
+    ) {
+        (false, false) => publish_fresh_new_import(staging_paths, final_paths),
+        (true, false) => {
+            complete_partial_new_import(PublishedTree::Capability, staging_paths, final_paths)
+        }
+        (false, true) => {
+            complete_partial_new_import(PublishedTree::Vendor, staging_paths, final_paths)
+        }
+        (true, true) => Err(SourceImportStorageError::AlreadyExists {
+            path: final_paths.capability_dir.clone(),
+        }),
+    }
+}
+
+fn publish_fresh_new_import(
     staging_paths: &ImportTreePaths,
     final_paths: &ImportTreePaths,
 ) -> Result<(), SourceImportStorageError> {

@@ -26,6 +26,17 @@ pub(super) fn publish_path(from: &Path, to: &Path) -> Result<(), SourceImportSto
     })
 }
 
+pub(super) fn path_exists(path: &Path) -> Result<bool, SourceImportStorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(SourceImportStorageError::InspectPath {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
 pub(super) fn move_path_if_exists(
     from: &Path,
     to: &Path,
