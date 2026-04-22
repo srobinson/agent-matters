@@ -107,6 +107,13 @@ pub fn validate_profile_scope(
     };
     let manifest_path = PathBuf::from(&record.source_path).join(MANIFEST_FILE_NAME);
 
+    if !scope.has_allowed_targets()
+        && let Some(diagnostic) = missing_scope_targets(&result.profile, &scope, &manifest_path) {
+            result.status = ProfileScopeValidationStatus::Unrestricted;
+            result.diagnostics.push(diagnostic);
+            return result;
+        }
+
     let canonical_path = match fs::canonicalize(&requested_path) {
         Ok(path) => path,
         Err(source) => {
@@ -124,9 +131,6 @@ pub fn validate_profile_scope(
 
     if !scope.has_allowed_targets() {
         result.status = ProfileScopeValidationStatus::Unrestricted;
-        if let Some(diagnostic) = missing_scope_targets(&result.profile, &scope, &manifest_path) {
-            result.diagnostics.push(diagnostic);
-        }
         return result;
     }
 

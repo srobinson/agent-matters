@@ -131,6 +131,27 @@ fn scope_enforcement_fail_without_targets_reports_error() {
 }
 
 #[test]
+fn scope_enforcement_fail_without_targets_reports_error_before_missing_path() {
+    let repo = valid_repo();
+    let workspace = repo.path().join("missing");
+    set_scope(
+        &repo,
+        r#"enforcement = "fail"
+"#,
+    );
+
+    let result = validate(&repo, &workspace);
+
+    assert!(result.has_error_diagnostics());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "profile.scope.missing-targets")
+    );
+}
+
+#[test]
 fn path_in_scope_passes() {
     let repo = valid_repo();
     let allowed = repo.path().join("allowed");
