@@ -2,6 +2,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use agent_matters_capabilities::catalog::catalog_index_path;
 use assert_cmd::Command;
 use tempfile::TempDir;
 
@@ -16,7 +17,7 @@ pub(crate) fn fixture_path(relative: &str) -> PathBuf {
 }
 
 pub(crate) fn write_corrupt_catalog_index(state: &TempDir) -> PathBuf {
-    let path = state.path().join("indexes/catalog.json");
+    let path = catalog_index_path(state.path());
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(&path, "{not valid json").unwrap();
     path
