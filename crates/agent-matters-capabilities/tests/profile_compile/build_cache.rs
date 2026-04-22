@@ -93,13 +93,7 @@ fn compile_removes_temp_build_dir_after_pre_rename_write_failure() {
     })
     .unwrap();
     assert_eq!(planned.diagnostics, Vec::new());
-    let plan = planned.plan.unwrap();
-    let build_parent = state
-        .path()
-        .join(&plan.paths.build_dir)
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let build_parent = temp_build_parent(state.path(), planned.plan.unwrap().paths.build_dir);
 
     let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
 
@@ -108,13 +102,41 @@ fn compile_removes_temp_build_dir_after_pre_rename_write_failure() {
     assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
     assert_eq!(result.diagnostics[0].code, "profile.build.write-failed");
     assert!(result.diagnostics[0].message.contains("must be relative"));
-    let temp_dirs = fs::read_dir(build_parent)
+    assert_eq!(temp_build_dirs(&build_parent), Vec::<String>::new());
+}
+
+#[test]
+fn compile_removes_temp_build_dir_after_later_runtime_home_write_failure() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    fs::write(repo.path().join("catalog/escape.sh"), "#!/bin/sh\n").unwrap();
+    let manifest = repo
+        .path()
+        .join("catalog/hooks/session-logger/manifest.toml");
+    let updated = fs::read_to_string(&manifest)
         .unwrap()
-        .filter_map(Result::ok)
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| name.starts_with('.') && name.contains(".build.tmp-"))
-        .collect::<Vec<_>>();
-    assert_eq!(temp_dirs, Vec::<String>::new());
+        .replace("script = \"hook.sh\"", "script = \"../../escape.sh\"");
+    fs::write(manifest, updated).unwrap();
+    let planned = plan_profile_build(BuildProfilePlanRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: state.path().to_path_buf(),
+        profile: "github-researcher".to_string(),
+        runtime: Some("codex".to_string()),
+    })
+    .unwrap();
+    assert_eq!(planned.diagnostics, Vec::new());
+    let build_parent = temp_build_parent(state.path(), planned.plan.unwrap().paths.build_dir);
+
+    let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
+
+    assert!(result.build.is_none());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+    assert_eq!(result.diagnostics[0].code, "profile.build.write-failed");
+    assert!(result.diagnostics[0].message.contains(
+        "runtime home file path `hooks/session-logger/../../escape.sh` must be relative"
+    ));
+    assert_eq!(temp_build_dirs(&build_parent), Vec::<String>::new());
 }
 
 #[cfg(unix)]
@@ -152,4 +174,17 @@ fn compile_reports_error_when_state_directory_is_not_writable() {
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
     assert_eq!(result.diagnostics[0].code, "profile.build.write-failed");
+}
+
+fn temp_build_parent(state: &std::path::Path, build_dir: std::path::PathBuf) -> std::path::PathBuf {
+    state.join(build_dir).parent().unwrap().to_path_buf()
+}
+
+fn temp_build_dirs(build_parent: &std::path::Path) -> Vec<String> {
+    fs::read_dir(build_parent)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.starts_with('.') && name.contains(".build.tmp-"))
+        .collect()
 }

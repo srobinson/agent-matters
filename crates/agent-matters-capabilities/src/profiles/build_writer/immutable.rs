@@ -102,3 +102,56 @@ fn write_runtime_home_files(home_dir: &Path, files: &[RuntimeHomeFile]) -> io::R
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use agent_matters_core::runtime::RuntimeCredentialSymlink;
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::profiles::{BuildProfilePlanRequest, plan_profile_build};
+
+    #[test]
+    fn fresh_build_cleanup_preserves_credential_symlink_write_error() {
+        let repo_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/catalogs/valid");
+        let state = TempDir::new().unwrap();
+        let planned = plan_profile_build(BuildProfilePlanRequest {
+            repo_root,
+            user_state_dir: state.path().to_path_buf(),
+            profile: "github-researcher".to_string(),
+            runtime: Some("codex".to_string()),
+        })
+        .unwrap();
+        assert_eq!(planned.diagnostics, Vec::new());
+        let plan = planned.plan.unwrap();
+
+        let scratch = TempDir::new().unwrap();
+        let temp_dir = scratch.path().join(".credential-failure.build.tmp-test");
+        let credential_source = scratch.path().join("auth.json");
+        fs::write(&credential_source, br#"{"token":"test"}"#).unwrap();
+        let home = RuntimeHomeRenderResult {
+            files: vec![RuntimeHomeFile::text("auth.json", "{}\n")],
+            diagnostics: Vec::new(),
+        };
+        let credential_symlinks = vec![RuntimeCredentialSymlink::new(
+            Some(credential_source),
+            "auth.json",
+        )];
+
+        let error = write_fresh_build_or_cleanup(&temp_dir, &plan, &home, &credential_symlinks)
+            .unwrap_err();
+
+        assert!(
+            error.to_string().contains("credential link path"),
+            "{error}"
+        );
+        assert!(
+            error.to_string().contains("exists and is not a symlink"),
+            "{error}"
+        );
+        assert!(!temp_dir.exists());
+    }
+}
