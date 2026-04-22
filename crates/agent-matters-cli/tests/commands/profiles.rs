@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use predicates::str::contains;
 use tempfile::TempDir;
 
-use crate::common::{bin, fixture_path};
+use crate::common::{bin, fixture_path, write_corrupt_catalog_index};
 
 fn copy_dir(source: &Path, destination: &Path) {
     fs::create_dir_all(destination).unwrap();
@@ -124,6 +124,40 @@ fn profiles_list_json_includes_index_metadata() {
             .iter()
             .any(|profile| profile["id"] == "github-researcher")
     );
+}
+
+#[test]
+fn profiles_list_json_recovers_corrupt_generated_index() {
+    let state = TempDir::new().unwrap();
+    let index_path = write_corrupt_catalog_index(&state);
+
+    let output = bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["profiles", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["index_status"], "recovered-corrupt");
+    assert!(
+        json["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "catalog.index-corrupt")
+    );
+    assert!(
+        json["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|profile| profile["id"] == "github-researcher")
+    );
+    serde_json::from_str::<serde_json::Value>(&fs::read_to_string(index_path).unwrap()).unwrap();
 }
 
 #[test]

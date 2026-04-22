@@ -15,6 +15,13 @@ pub(crate) fn fixture_path(relative: &str) -> PathBuf {
         .join(relative)
 }
 
+pub(crate) fn write_corrupt_catalog_index(state: &TempDir) -> PathBuf {
+    let path = state.path().join("indexes/catalog.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "{not valid json").unwrap();
+    path
+}
+
 pub(crate) fn write_fake_skills_bin(dir: &TempDir) -> PathBuf {
     write_script(
         dir,

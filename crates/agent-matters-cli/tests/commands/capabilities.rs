@@ -1,7 +1,7 @@
 use predicates::str::contains;
 use tempfile::TempDir;
 
-use crate::common::{bin, fixture_path};
+use crate::common::{bin, fixture_path, write_corrupt_catalog_index};
 
 #[test]
 fn capabilities_list_reads_generated_index_as_json() {
@@ -33,6 +33,41 @@ fn capabilities_list_reads_generated_index_as_json() {
             .iter()
             .any(|capability| capability["id"] == "skill:playwright")
     );
+}
+
+#[test]
+fn capabilities_list_json_recovers_corrupt_generated_index() {
+    let state = TempDir::new().unwrap();
+    let index_path = write_corrupt_catalog_index(&state);
+
+    let output = bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args(["capabilities", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["index_status"], "recovered-corrupt");
+    assert!(
+        json["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "catalog.index-corrupt")
+    );
+    assert!(
+        json["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|capability| capability["id"] == "skill:playwright")
+    );
+    serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(index_path).unwrap())
+        .unwrap();
 }
 
 #[test]
