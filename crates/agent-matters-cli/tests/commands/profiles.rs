@@ -1,7 +1,23 @@
+use std::{fs, path::Path};
+
 use predicates::str::contains;
 use tempfile::TempDir;
 
 use crate::common::{bin, fixture_path};
+
+fn copy_dir(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).unwrap();
+    for entry in fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_dir(&source_path, &destination_path);
+        } else {
+            fs::copy(&source_path, &destination_path).unwrap();
+        }
+    }
+}
 
 #[test]
 fn profiles_resolve_json_returns_session_cache_profile() {
@@ -23,6 +39,44 @@ fn profiles_resolve_json_returns_session_cache_profile() {
         .stdout(contains("\"kind\": \"jit-profile\""))
         .stdout(contains("\"profile_manifest_path\""))
         .stdout(contains("\"mcp:linear\""));
+}
+
+#[test]
+fn profiles_resolve_json_reports_profile_diagnostics_and_exit_code() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    copy_dir(&fixture_path("catalogs/valid"), repo.path());
+    let manifest_path = repo
+        .path()
+        .join("profiles/renamed-profile-dir/manifest.toml");
+    let updated = fs::read_to_string(&manifest_path)
+        .unwrap()
+        .replace("\"agent:github-researcher\"", "\"agent:missing\"");
+    fs::write(&manifest_path, updated).unwrap();
+
+    let output = bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .args([
+            "profiles",
+            "resolve",
+            "use github-researcher for this repository investigation",
+            "--runtime",
+            "codex",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .code(1)
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic["code"] == "profile.instruction-not-found" && diagnostic["severity"] == "error"
+    }));
 }
 
 #[test]
