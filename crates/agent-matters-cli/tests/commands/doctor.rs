@@ -7,10 +7,16 @@ use tempfile::TempDir;
 
 use crate::common::{bin, fixture_path};
 
+const CODEX_TEST_TOKEN: &str = "alp_1986_secret_credential_value";
+
 fn native_home_with_codex_auth(root: &TempDir) -> std::path::PathBuf {
     let home = root.path().join("native-home");
     fs::create_dir_all(home.join(".codex")).unwrap();
-    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
+    fs::write(
+        home.join(".codex/auth.json"),
+        format!(r#"{{"token":"{CODEX_TEST_TOKEN}"}}"#),
+    )
+    .unwrap();
     home
 }
 
@@ -134,7 +140,9 @@ fn doctor_json_reports_invalid_runtime_pointer() {
         .stdout(contains("github-researcher"))
         .stdout(contains("codex"))
         .stdout(contains("auth.json").not())
-        .stdout(contains("\"token\"").not());
+        .stdout(contains("\"token\"").not())
+        .stdout(contains(CODEX_TEST_TOKEN).not())
+        .stderr(contains(CODEX_TEST_TOKEN).not());
 }
 
 #[test]
@@ -157,7 +165,9 @@ fn doctor_json_fails_when_state_root_parent_is_file() {
         ))
         .stdout(contains("\"severity\": \"error\""))
         .stdout(contains("\"writable\": false"))
-        .stdout(contains("\"token\"").not());
+        .stdout(contains("\"token\"").not())
+        .stdout(contains(CODEX_TEST_TOKEN).not())
+        .stderr(contains(CODEX_TEST_TOKEN).not());
 }
 
 #[test]
