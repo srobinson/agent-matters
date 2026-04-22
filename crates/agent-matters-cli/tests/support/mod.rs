@@ -1,12 +1,18 @@
 #![allow(dead_code)]
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::catalog::catalog_index_path;
-use agent_matters_core::domain::{CapabilityId, EnvVarRequirement, Requirements};
-use agent_matters_core::manifest::{CapabilityManifest, ProfileManifest};
+use agent_matters_core::domain::{
+    CapabilityId, EnvVarRequirement, Requirements, RuntimeId, ScopeConstraints,
+};
+use agent_matters_core::manifest::{
+    CapabilityManifest, CapabilityRuntimeManifest, ProfileManifest, ProfileRuntimeManifest,
+    ProfileRuntimesManifest, ScopeEnforcement,
+};
 use assert_cmd::Command;
 use tempfile::TempDir;
 
@@ -90,6 +96,63 @@ pub(crate) fn replace_profile_instruction(repo: &Path, manifest: &str, old: &str
         .find(|instruction| **instruction == old)
         .expect("profile instruction fixture exists");
     *instruction = new;
+    fs::write(path, toml::to_string_pretty(&manifest).unwrap()).unwrap();
+}
+
+pub(crate) fn set_profile_path_scope(
+    repo: &Path,
+    manifest: &str,
+    paths: Vec<String>,
+    enforcement: ScopeEnforcement,
+) {
+    let path = repo.join(manifest);
+    let raw = fs::read_to_string(&path).unwrap();
+    let mut manifest: ProfileManifest = toml::from_str(&raw).unwrap();
+    manifest.scope = Some(ScopeConstraints {
+        paths,
+        github_repos: Vec::new(),
+        enforcement,
+    });
+    fs::write(path, toml::to_string_pretty(&manifest).unwrap()).unwrap();
+}
+
+pub(crate) fn set_profile_runtimes(repo: &Path, manifest: &str, runtimes: &[(&str, bool)]) {
+    let path = repo.join(manifest);
+    let raw = fs::read_to_string(&path).unwrap();
+    let mut manifest: ProfileManifest = toml::from_str(&raw).unwrap();
+    let default = manifest
+        .runtimes
+        .as_ref()
+        .and_then(|runtimes| runtimes.default.clone());
+    let entries = runtimes
+        .iter()
+        .map(|(runtime, enabled)| {
+            (
+                runtime.parse::<RuntimeId>().unwrap(),
+                ProfileRuntimeManifest {
+                    enabled: *enabled,
+                    model: None,
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    manifest.runtimes = Some(ProfileRuntimesManifest { default, entries });
+    fs::write(path, toml::to_string_pretty(&manifest).unwrap()).unwrap();
+}
+
+pub(crate) fn set_capability_runtime_support(
+    repo: &Path,
+    manifest: &str,
+    runtime: &str,
+    supported: bool,
+) {
+    let path = repo.join(manifest);
+    let raw = fs::read_to_string(&path).unwrap();
+    let mut manifest: CapabilityManifest = toml::from_str(&raw).unwrap();
+    manifest.runtimes.entries.insert(
+        runtime.parse::<RuntimeId>().unwrap(),
+        CapabilityRuntimeManifest { supported },
+    );
     fs::write(path, toml::to_string_pretty(&manifest).unwrap()).unwrap();
 }
 

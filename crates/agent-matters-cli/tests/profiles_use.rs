@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use agent_matters_core::manifest::ScopeEnforcement;
 use predicates::str::contains;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -9,8 +10,12 @@ use tempfile::TempDir;
 mod common;
 
 use common::{
-    add_required_env, bin, fixture_path, native_home_with_codex_auth, valid_catalog_repo,
+    add_required_env, bin, fixture_path, native_home_with_codex_auth,
+    set_capability_runtime_support, set_profile_path_scope, set_profile_runtimes,
+    valid_catalog_repo,
 };
+
+const GITHUB_RESEARCHER_PROFILE: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 #[test]
 fn profiles_use_renders_manual_launch_for_explicit_path() {
@@ -110,12 +115,8 @@ fn profiles_use_ambiguous_runtime_exits_nonzero_without_flag() {
     add_claude_support(repo.path());
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        GITHUB_RESEARCHER_PROFILE,
+        &[("codex", true), ("claude", true)],
     );
 
     bin()
@@ -136,12 +137,11 @@ fn profiles_use_scope_fail_blocks_out_of_scope_path() {
     let allowed = repo.path().join("allowed");
     fs::create_dir_all(&allowed).unwrap();
     let outside = TempDir::new().unwrap();
-    append_profile_scope(
+    set_profile_path_scope(
         repo.path(),
-        &format!(
-            "[scope]\npaths = [\"{}\"]\nenforcement = \"fail\"\n",
-            allowed.display()
-        ),
+        GITHUB_RESEARCHER_PROFILE,
+        vec![allowed.display().to_string()],
+        ScopeEnforcement::Fail,
     );
 
     bin()
@@ -201,21 +201,6 @@ fn profiles_use_json_includes_launch_env_and_args() {
     );
 }
 
-fn append_profile_scope(repo: &Path, scope: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let mut updated = fs::read_to_string(&path).unwrap();
-    updated.push('\n');
-    updated.push_str(scope);
-    fs::write(path, updated).unwrap();
-}
-
-fn set_profile_runtimes(repo: &Path, runtimes: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let body = fs::read_to_string(&path).unwrap();
-    let prefix = body.split("[runtimes.codex]").next().unwrap();
-    fs::write(path, format!("{prefix}{runtimes}")).unwrap();
-}
-
 fn add_claude_support(repo: &Path) {
     for manifest in [
         "catalog/agents/github-researcher/manifest.toml",
@@ -225,9 +210,6 @@ fn add_claude_support(repo: &Path) {
         "catalog/runtime-settings/codex-defaults/manifest.toml",
         "catalog/skills/renamed-skill-dir/manifest.toml",
     ] {
-        let path = repo.join(manifest);
-        let mut updated = fs::read_to_string(&path).unwrap();
-        updated.push_str("\n[runtimes.claude]\nsupported = true\n");
-        fs::write(path, updated).unwrap();
+        set_capability_runtime_support(repo, manifest, "claude", true);
     }
 }
