@@ -39,7 +39,12 @@ fn state_root_is_writable(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> boo
             }
             writable
         }
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {
+        Err(source)
+            if matches!(
+                source.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            ) =>
+        {
             missing_state_root_parent_is_writable(path, diagnostics)
         }
         Err(source) => {
@@ -62,13 +67,37 @@ fn missing_state_root_parent_is_writable(path: &Path, diagnostics: &mut Vec<Diag
                 }
                 return writable;
             }
-            Ok(_) => continue,
+            Ok(_) => {
+                diagnostics.push(state_root_parent_not_directory(path, ancestor));
+                return false;
+            }
             Err(source) if source.kind() == io::ErrorKind::NotFound => continue,
             Err(source) => {
                 diagnostics.push(state_root_read_failed(ancestor, &source));
                 return false;
             }
         }
+    }
+
+    if path.is_relative() {
+        let current_dir = Path::new(".");
+        return match fs::metadata(current_dir) {
+            Ok(metadata) if metadata.is_dir() => {
+                let writable = directory_is_writable(&metadata);
+                if !writable {
+                    diagnostics.push(state_root_not_writable(path, current_dir));
+                }
+                writable
+            }
+            Ok(_) => {
+                diagnostics.push(state_root_parent_not_directory(path, current_dir));
+                false
+            }
+            Err(source) => {
+                diagnostics.push(state_root_read_failed(current_dir, &source));
+                false
+            }
+        };
     }
 
     diagnostics.push(state_root_not_writable(path, path));
@@ -260,6 +289,19 @@ fn state_root_not_writable(path: &Path, checked: &Path) -> Diagnostic {
         ),
     )
     .with_recovery_hint("fix directory permissions before compiling runtime homes")
+}
+
+fn state_root_parent_not_directory(path: &Path, checked: &Path) -> Diagnostic {
+    Diagnostic::new(
+        DiagnosticSeverity::Error,
+        "runtime.state-root-parent-not-directory",
+        format!(
+            "generated state root `{}` cannot be created because `{}` is not a directory",
+            path.display(),
+            checked.display()
+        ),
+    )
+    .with_recovery_hint("choose a different AGENT_MATTERS_STATE_DIR or remove the blocking file")
 }
 
 fn state_root_read_failed(path: &Path, source: &io::Error) -> Diagnostic {

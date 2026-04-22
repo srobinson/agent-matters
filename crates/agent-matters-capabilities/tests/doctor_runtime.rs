@@ -212,6 +212,50 @@ fn non_writable_state_root_is_error() {
 }
 
 #[test]
+fn missing_relative_state_root_uses_current_directory_writability() {
+    let repo = valid_repo();
+    let state = tempfile::Builder::new()
+        .prefix("agent-matters-relative-state")
+        .tempdir_in(".")
+        .unwrap();
+    let relative_state = PathBuf::from(state.path().file_name().unwrap().to_os_string());
+    drop(state);
+
+    let result = run_doctor(DoctorRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: relative_state,
+        native_home_dir: None,
+    })
+    .unwrap();
+
+    assert!(result.generated_state.writable);
+    assert_eq!(result.diagnostics, Vec::new());
+}
+
+#[test]
+fn missing_state_root_with_file_parent_is_error() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let blocker = state.path().join("not-a-directory");
+    fs::write(&blocker, b"blocks nested state roots").unwrap();
+
+    let result = run_doctor(DoctorRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: blocker.join("child-state"),
+        native_home_dir: None,
+    })
+    .unwrap();
+
+    let diagnostic = diagnostic_with_code(
+        &result.diagnostics,
+        "runtime.state-root-parent-not-directory",
+    );
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert!(!result.generated_state.writable);
+    assert!(result.has_error_diagnostics());
+}
+
+#[test]
 fn fresh_install_with_no_builds_passes_generated_cache_checks() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
