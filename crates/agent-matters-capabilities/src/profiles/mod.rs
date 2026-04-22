@@ -1,6 +1,7 @@
 //! Profile use cases.
 
 mod adapter;
+mod adapter_capabilities;
 mod build_plan;
 mod build_writer;
 mod claude_adapter;
