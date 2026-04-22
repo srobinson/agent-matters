@@ -1,6 +1,7 @@
 use std::fs;
 
 use agent_matters_capabilities::catalog::catalog_index_path;
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use tempfile::TempDir;
 
@@ -103,6 +104,60 @@ fn doctor_json_fails_on_unreadable_generated_index() {
         .stdout(contains("\"status\": \"read-failed\""))
         .stdout(contains("\"severity\": \"error\""))
         .stdout(contains("\"code\": \"catalog.index-read-failed\""));
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_json_reports_invalid_runtime_pointer() {
+    use std::os::unix::fs::symlink;
+
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&state);
+    let pointer = state.path().join("runtimes/github-researcher/codex");
+    fs::create_dir_all(pointer.parent().unwrap()).unwrap();
+    symlink(
+        "../../builds/codex/github-researcher/missing/home",
+        &pointer,
+    )
+    .unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home)
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("\"code\": \"runtime.pointer-target-invalid\""))
+        .stdout(contains("\"severity\": \"error\""))
+        .stdout(contains("github-researcher"))
+        .stdout(contains("codex"))
+        .stdout(contains("auth.json").not())
+        .stdout(contains("\"token\"").not());
+}
+
+#[test]
+fn doctor_json_fails_when_state_root_parent_is_file() {
+    let scratch = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&scratch);
+    let blocker = scratch.path().join("not-a-directory");
+    fs::write(&blocker, b"blocks nested state roots").unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", blocker.join("child-state"))
+        .env("HOME", home)
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains(
+            "\"code\": \"runtime.state-root-parent-not-directory\"",
+        ))
+        .stdout(contains("\"severity\": \"error\""))
+        .stdout(contains("\"writable\": false"))
+        .stdout(contains("\"token\"").not());
 }
 
 #[test]
