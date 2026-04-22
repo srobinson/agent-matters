@@ -10,7 +10,7 @@ use agent_matters_capabilities::sources::{
 use agent_matters_core::domain::DiagnosticReport;
 use clap::Subcommand;
 
-use super::{default_catalog_paths, emit_diagnostics, generated_help, help_text};
+use super::{default_source_import_paths, emit_diagnostics, generated_help, help_text};
 
 /// Verbs for `agent-matters sources`.
 #[derive(Debug, Subcommand)]
@@ -96,7 +96,7 @@ fn run_search(source: &str, query: &str, json: bool) -> anyhow::Result<i32> {
 }
 
 fn run_import(locator: &str, json: bool, update: bool) -> anyhow::Result<i32> {
-    let (repo_root, user_state_dir) = default_catalog_paths()?;
+    let (repo_root, user_state_dir) = default_source_import_paths()?;
     match import_source(ImportSourceRequest {
         repo_root: repo_root.clone(),
         user_state_dir,

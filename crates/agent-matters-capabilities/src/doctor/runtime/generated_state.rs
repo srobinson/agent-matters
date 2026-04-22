@@ -275,7 +275,7 @@ fn state_root_not_directory(path: &Path) -> Diagnostic {
             path.display()
         ),
     )
-    .with_recovery_hint("choose a directory path for AGENT_MATTERS_STATE_DIR")
+    .with_recovery_hint("choose a directory path for AGENT_MATTERS_DIR")
 }
 
 fn state_root_not_writable(path: &Path, checked: &Path) -> Diagnostic {
@@ -301,7 +301,7 @@ fn state_root_parent_not_directory(path: &Path, checked: &Path) -> Diagnostic {
             checked.display()
         ),
     )
-    .with_recovery_hint("choose a different AGENT_MATTERS_STATE_DIR or remove the blocking file")
+    .with_recovery_hint("choose a different AGENT_MATTERS_DIR or remove the blocking file")
 }
 
 fn state_root_read_failed(path: &Path, source: &io::Error) -> Diagnostic {

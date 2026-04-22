@@ -53,7 +53,7 @@ fn sources_import_writes_catalog_vendor_and_index() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args(["sources", "import", "skills.sh:owner/repo@playwright"])
         .assert()
@@ -65,16 +65,20 @@ fn sources_import_writes_catalog_vendor_and_index() {
         .stdout(contains("vendor\tvendor/skills.sh/owner/repo@playwright"));
 
     assert!(
-        repo.path()
+        state
+            .path()
             .join("catalog/skills/playwright/manifest.toml")
             .exists()
     );
     assert!(
-        repo.path()
+        state
+            .path()
             .join("vendor/skills.sh/owner/repo@playwright/record.json")
             .exists()
     );
     assert!(state.path().join("indexes/catalog.json").exists());
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
 }
 
 #[test]
@@ -87,7 +91,7 @@ fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args(["sources", "import", locator])
         .assert()
@@ -96,7 +100,7 @@ fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args(["sources", "import", locator])
         .assert()
@@ -104,14 +108,14 @@ fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
         .stdout(contains("Already up to date skill:playwright"));
 
     fs::write(
-        repo.path().join("catalog/skills/playwright/SKILL.md"),
+        state.path().join("catalog/skills/playwright/SKILL.md"),
         "# Local Playwright\n",
     )
     .unwrap();
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args(["sources", "import", locator])
         .assert()
@@ -122,16 +126,18 @@ fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args(["sources", "import", locator, "--update"])
         .assert()
         .success()
         .stdout(contains("Updated skill:playwright"));
     assert_eq!(
-        fs::read_to_string(repo.path().join("catalog/skills/playwright/SKILL.md")).unwrap(),
+        fs::read_to_string(state.path().join("catalog/skills/playwright/SKILL.md")).unwrap(),
         "---\nname: playwright\ndescription: Mock Playwright skill.\nmetadata:\n  version: \"2.0.0\"\n---\n\n# Playwright\n"
     );
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
 }
 
 #[test]
@@ -151,7 +157,7 @@ fn sources_import_json_reports_policy_diagnostic() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
         .args([
             "sources",
@@ -169,4 +175,6 @@ fn sources_import_json_reports_policy_diagnostic() {
 
     assert!(!repo.path().join("catalog").exists());
     assert!(!repo.path().join("vendor").exists());
+    assert!(!state.path().join("catalog").exists());
+    assert!(!state.path().join("vendor").exists());
 }

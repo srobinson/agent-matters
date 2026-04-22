@@ -27,7 +27,7 @@ fn doctor_human_reports_catalog_integrity_success() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor"])
         .assert()
@@ -44,7 +44,7 @@ fn doctor_human_explains_missing_codex_auth() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor"])
         .assert()
@@ -60,7 +60,7 @@ fn doctor_json_reports_structured_diagnostics_and_exit_code() {
 
     bin()
         .current_dir(fixture_path("catalogs/broken"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["doctor", "--json"])
         .assert()
         .failure()
@@ -81,7 +81,7 @@ fn doctor_json_fails_on_corrupt_generated_index() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor", "--json"])
         .assert()
@@ -103,7 +103,7 @@ fn doctor_human_fails_on_corrupt_generated_index() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor"])
         .assert()
@@ -129,7 +129,7 @@ fn doctor_json_fails_on_unreadable_generated_index() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor", "--json"])
         .assert()
@@ -150,7 +150,7 @@ fn doctor_human_fails_on_unreadable_generated_index() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor"])
         .assert()
@@ -183,7 +183,7 @@ fn doctor_json_reports_invalid_runtime_pointer() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home)
         .args(["doctor", "--json"])
         .assert()
@@ -208,7 +208,7 @@ fn doctor_json_fails_when_state_root_parent_is_file() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", blocker.join("child-state"))
+        .env("AGENT_MATTERS_DIR", blocker.join("child-state"))
         .env("HOME", home)
         .args(["doctor", "--json"])
         .assert()
@@ -230,7 +230,7 @@ fn doctor_human_groups_diagnostics_by_severity_and_source() {
 
     bin()
         .current_dir(fixture_path("catalogs/broken"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["doctor"])
         .assert()
         .failure()

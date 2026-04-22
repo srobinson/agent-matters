@@ -16,7 +16,7 @@ use common::{
 fn compile_json(repo: &Path, state: &Path, home: &Path) -> Value {
     let output = bin()
         .current_dir(repo)
-        .env("AGENT_MATTERS_STATE_DIR", state)
+        .env("AGENT_MATTERS_DIR", state)
         .env("HOME", home)
         .args([
             "profiles",
@@ -41,7 +41,7 @@ fn profiles_compile_renders_human_summary_and_writes_runtime_pointer() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .args([
             "profiles",
@@ -81,7 +81,7 @@ fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
 
     let output = bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .env("LINEAR_API_KEY", "secret-value-never-rendered")
         .args([
@@ -173,7 +173,7 @@ fn profiles_compile_tolerates_non_utf8_environment_values() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .env(
             "AGENT_MATTERS_BINARY_VALUE",
@@ -204,7 +204,7 @@ fn profiles_compile_human_output_includes_missing_env_warning() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .env_remove("LINEAR_API_KEY")
         .args([
@@ -234,7 +234,7 @@ fn profiles_compile_missing_required_capability_exits_with_error() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args([
             "profiles",
             "compile",
@@ -254,7 +254,7 @@ fn profiles_compile_runtime_incompatibility_exits_with_error() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args([
             "profiles",
             "compile",
