@@ -69,8 +69,10 @@ Run the full workspace gate before every commit:
 just check && just build && just test
 ```
 
-* `just check` runs `cargo fmt` plus `cargo clippy --workspace
-  --all-targets -- -D warnings`. Warnings are errors.
+* `just check` runs `cargo fmt --all` plus `cargo clippy --workspace
+  --all-targets --fix --allow-dirty -- -D warnings`. It is a repair gate:
+  formatting and machine-applicable clippy fixes may rewrite files. Warnings
+  are errors.
 * `just build` builds the workspace in debug mode.
 * `just test` runs the full workspace suite via `cargo nextest`.
 
