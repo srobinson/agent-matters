@@ -177,6 +177,44 @@ fn unsafe_vendor_path_is_error_without_reading_outside_vendor_storage() {
     assert!(result.has_error_diagnostics());
 }
 
+#[cfg(unix)]
+#[test]
+fn symlinked_vendor_path_escape_is_error_without_reading_outside_vendor_storage() {
+    use std::os::unix::fs::symlink;
+
+    let repo = TempDir::new().unwrap();
+    copy_dir(&fixture_path("catalogs/imported"), repo.path());
+    fs::write(
+        repo.path().join("catalog/skills/playwright/SKILL.md"),
+        "Playwright skill\n",
+    )
+    .unwrap();
+    let vendor_source = repo.path().join("vendor/skills.sh");
+    let outside = repo.path().join("outside");
+    fs::create_dir_all(&vendor_source).unwrap();
+    fs::create_dir_all(outside.join("playwright")).unwrap();
+    fs::write(outside.join("playwright/record.json"), "{}\n").unwrap();
+    symlink(&outside, vendor_source.join("escaped")).unwrap();
+    let manifest = repo.path().join("catalog/skills/playwright/manifest.toml");
+    let updated = fs::read_to_string(&manifest).unwrap().replace(
+        "locator = \"playwright\"",
+        "locator = \"escaped/playwright\"",
+    );
+    fs::write(&manifest, updated).unwrap();
+    let state = TempDir::new().unwrap();
+
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
+
+    let invalid = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "catalog.vendor-record-path-invalid")
+        .expect("missing invalid vendor path diagnostic");
+    assert_eq!(invalid.severity, DiagnosticSeverity::Error);
+    assert!(invalid.message.contains("skill:playwright"));
+    assert!(result.has_error_diagnostics());
+}
+
 #[test]
 fn imported_overlay_missing_provenance_is_error() {
     let repo = TempDir::new().unwrap();

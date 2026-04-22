@@ -1,6 +1,9 @@
 //! Catalog path constants shared by loaders, doctor, and compiler code.
 
-use std::path::{Component, Path};
+use std::{
+    fs, io,
+    path::{Component, Path},
+};
 
 use crate::config::REPO_DEFAULTS_DIR_NAME;
 use crate::domain::CapabilityKind;
@@ -43,12 +46,50 @@ pub const fn known_capability_dir_names() -> &'static [&'static str] {
 
 pub fn path_is_in_repo_vendor(repo_root: &Path, path: &Path) -> bool {
     let vendor_root = repo_root.join(VENDOR_DIR_NAME);
-    let Ok(relative) = path.strip_prefix(&vendor_root) else {
+    path_is_structurally_in_vendor(&vendor_root, path)
+        && path_resolves_inside_repo_vendor(repo_root, &vendor_root, path)
+}
+
+fn path_is_structurally_in_vendor(vendor_root: &Path, path: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(vendor_root) else {
         return false;
     };
     let mut components = relative.components().peekable();
     components.peek().is_some()
         && components.all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn path_resolves_inside_repo_vendor(repo_root: &Path, vendor_root: &Path, path: &Path) -> bool {
+    let Ok(canonical_vendor_root) = fs::canonicalize(vendor_root) else {
+        return true;
+    };
+    match fs::canonicalize(repo_root) {
+        Ok(canonical_repo_root) if !canonical_vendor_root.starts_with(&canonical_repo_root) => {
+            return false;
+        }
+        _ => {}
+    }
+    let Some(existing_path) = nearest_existing_path(path) else {
+        return true;
+    };
+    let Ok(canonical_existing_path) = fs::canonicalize(existing_path) else {
+        return true;
+    };
+    canonical_existing_path.starts_with(&canonical_vendor_root)
+}
+
+fn nearest_existing_path(path: &Path) -> Option<&Path> {
+    let mut candidate = Some(path);
+    while let Some(path) = candidate {
+        match fs::symlink_metadata(path) {
+            Ok(_) => return Some(path),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {
+                candidate = path.parent();
+            }
+            Err(_) => return None,
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -110,6 +151,28 @@ mod tests {
         assert!(!path_is_in_repo_vendor(
             repo_root,
             Path::new("/repo/outside")
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn vendor_paths_must_resolve_inside_vendor_storage() {
+        use std::os::unix::fs::symlink;
+
+        let repo = tempfile::TempDir::new().unwrap();
+        let vendor_source = repo.path().join("vendor/skills.sh");
+        let outside = repo.path().join("outside");
+        fs::create_dir_all(&vendor_source).unwrap();
+        fs::create_dir_all(outside.join("playwright")).unwrap();
+        symlink(&outside, vendor_source.join("escaped")).unwrap();
+
+        assert!(!path_is_in_repo_vendor(
+            repo.path(),
+            &vendor_source.join("escaped/playwright")
+        ));
+        assert!(!path_is_in_repo_vendor(
+            repo.path(),
+            &vendor_source.join("escaped/missing")
         ));
     }
 }
