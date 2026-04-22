@@ -111,6 +111,31 @@ fn scope_enforcement_warn_without_targets_reports_warning() {
 }
 
 #[test]
+fn scope_enforcement_warn_without_targets_keeps_missing_path_error() {
+    let repo = valid_repo();
+    let workspace = repo.path().join("missing");
+    set_scope(
+        &repo,
+        r#"enforcement = "warn"
+"#,
+    );
+
+    let result = validate(&repo, &workspace);
+    let diagnostic = result.diagnostics.first().unwrap();
+
+    assert_eq!(result.status, ProfileScopeValidationStatus::PathMissing);
+    assert!(result.has_error_diagnostics());
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Warning);
+    assert_eq!(diagnostic.code, "profile.scope.missing-targets");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "profile.scope.path-not-found")
+    );
+}
+
+#[test]
 fn scope_enforcement_fail_without_targets_reports_error() {
     let repo = valid_repo();
     set_scope(
@@ -142,12 +167,17 @@ fn scope_enforcement_fail_without_targets_reports_error_before_missing_path() {
 
     let result = validate(&repo, &workspace);
 
+    assert_eq!(result.status, ProfileScopeValidationStatus::PathMissing);
     assert!(result.has_error_diagnostics());
+    assert_eq!(
+        result.diagnostics.first().unwrap().code,
+        "profile.scope.missing-targets"
+    );
     assert!(
         result
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == "profile.scope.missing-targets")
+            .any(|diagnostic| diagnostic.code == "profile.scope.path-not-found")
     );
 }
 
