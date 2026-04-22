@@ -139,7 +139,7 @@ fn run_list(json: bool) -> anyhow::Result<i32> {
     emit_diagnostics(&result.diagnostics);
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&result.profiles)?);
+        println!("{}", serde_json::to_string_pretty(&result)?);
     } else if result.profiles.is_empty() {
         println!("No profiles found.");
     } else {

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use agent_matters_core::catalog::CapabilityIndexRecord;
 use agent_matters_core::domain::Diagnostic;
+use serde::Serialize;
 
 use crate::catalog::{
     CatalogIndexError, CatalogIndexStatus, LoadCatalogIndexRequest, load_or_refresh_catalog_index,
@@ -15,7 +16,7 @@ pub struct ListCapabilitiesRequest {
     pub user_state_dir: PathBuf,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListCapabilitiesResult {
     pub capabilities: Vec<CapabilityIndexRecord>,
     pub index_path: PathBuf,

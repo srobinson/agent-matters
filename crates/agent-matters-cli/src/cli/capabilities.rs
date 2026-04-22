@@ -73,7 +73,7 @@ fn run_list(json: bool) -> anyhow::Result<i32> {
     emit_diagnostics(&result.diagnostics);
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&result.capabilities)?);
+        println!("{}", serde_json::to_string_pretty(&result)?);
     } else if result.capabilities.is_empty() {
         println!("No capabilities found.");
     } else {

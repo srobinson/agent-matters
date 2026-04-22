@@ -36,7 +36,7 @@ in detail.
 name = "json"
 type = "boolean"
 cli_flag = "json"
-cli_help = "Emit machine readable JSON instead of the human table"
+cli_help = "Emit a JSON result object with profiles, index metadata, and diagnostics"
 
 [tools.profiles-show]
 cli_about = """
@@ -172,7 +172,7 @@ paths, and overlay metadata.
 name = "json"
 type = "boolean"
 cli_flag = "json"
-cli_help = "Emit machine readable JSON instead of the human table"
+cli_help = "Emit a JSON result object with capabilities, index metadata, and diagnostics"
 
 [tools.capabilities-show]
 cli_about = """

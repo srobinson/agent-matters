@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use agent_matters_core::catalog::ProfileIndexRecord;
 use agent_matters_core::domain::Diagnostic;
+use serde::Serialize;
 
 use crate::catalog::{
     CatalogIndexError, CatalogIndexStatus, LoadCatalogIndexRequest, load_or_refresh_catalog_index,
@@ -15,7 +16,7 @@ pub struct ListProfilesRequest {
     pub user_state_dir: PathBuf,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListProfilesResult {
     pub profiles: Vec<ProfileIndexRecord>,
     pub index_path: PathBuf,

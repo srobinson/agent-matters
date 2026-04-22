@@ -7,13 +7,32 @@ use crate::common::{bin, fixture_path};
 fn capabilities_list_reads_generated_index_as_json() {
     let state = TempDir::new().unwrap();
 
-    bin()
+    let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
         .env("AGENT_MATTERS_STATE_DIR", state.path())
         .args(["capabilities", "list", "--json"])
         .assert()
         .success()
-        .stdout(contains("\"skill:playwright\""));
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["index_status"], "rebuilt-missing");
+    assert!(
+        json["index_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("catalog.json")
+    );
+    assert_eq!(json["diagnostics"].as_array().unwrap().len(), 0);
+    assert!(
+        json["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|capability| capability["id"] == "skill:playwright")
+    );
 }
 
 #[test]

@@ -6,7 +6,7 @@
 #[rustfmt::skip]
 pub const PROFILES_LIST_ABOUT: &str = "List profiles discovered in the local catalog.\n\nEach profile line shows the profile id, kind, enabled runtimes, scope enforcement, and summary. Use `profiles show` to inspect a single profile in detail.";
 #[rustfmt::skip]
-pub const PROFILES_LIST_JSON_HELP: &str = "Emit machine readable JSON instead of the human table";
+pub const PROFILES_LIST_JSON_HELP: &str = "Emit a JSON result object with profiles, index metadata, and diagnostics";
 
 #[rustfmt::skip]
 pub const PROFILES_SHOW_ABOUT: &str = "Show a single profile and its resolved capability inventory.\n\nPrints the profile manifest, the ordered list of capabilities it includes, the instruction fragments those capabilities contribute, and the runtime settings that would apply for each registered runtime adapter.";
@@ -49,7 +49,7 @@ pub const PROFILES_USE_JSON_HELP: &str = "Emit machine readable JSON launch inst
 #[rustfmt::skip]
 pub const CAPABILITIES_LIST_ABOUT: &str = "List capabilities discovered in the local catalog.\n\nEach row includes the capability id, kind, runtime support, provenance state, and summary. Use `capabilities show` to inspect files, requirements, source paths, and overlay metadata.";
 #[rustfmt::skip]
-pub const CAPABILITIES_LIST_JSON_HELP: &str = "Emit machine readable JSON instead of the human table";
+pub const CAPABILITIES_LIST_JSON_HELP: &str = "Emit a JSON result object with capabilities, index metadata, and diagnostics";
 
 #[rustfmt::skip]
 pub const CAPABILITIES_SHOW_ABOUT: &str = "Show a single capability and its metadata.\n\nPrints the manifest details, source path, included files, runtime compatibility, requirements, provenance, and overlay metadata for one exact capability id.";
