@@ -3,7 +3,7 @@ use std::fs;
 use predicates::str::contains;
 use tempfile::TempDir;
 
-use crate::common::{bin, write_fake_skills_bin, write_script};
+use crate::common::{bin, write_fake_skills_bin};
 
 #[test]
 fn sources_search_renders_mocked_skills_results() {
@@ -35,21 +35,13 @@ fn sources_search_json_renders_mocked_skills_results() {
 
 #[test]
 fn sources_search_failure_emits_diagnostic() {
-    let tools = TempDir::new().unwrap();
-    let skills_bin = write_script(
-        &tools,
-        "fake-skills-fail",
-        "#!/bin/sh\nprintf 'npm offline\\n' >&2\nexit 1\n",
-    );
-
     bin()
-        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
-        .args(["sources", "search", "skills.sh", "playwright"])
+        .args(["sources", "search", "unknown-source", "playwright"])
         .assert()
         .failure()
         .code(1)
         .stderr(contains("source.search-failed"))
-        .stderr(contains("npm offline"));
+        .stderr(contains("unsupported source"));
 }
 
 #[test]
