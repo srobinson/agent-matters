@@ -35,10 +35,7 @@ pub(super) fn write_immutable_build(
 
     let temp_dir = temp_sibling(&paths.build_dir, "build");
     remove_path_if_exists(&temp_dir)?;
-    fs::create_dir_all(temp_dir.join(RUNTIME_HOME_DIR_NAME))?;
-    write_runtime_home_files(&temp_dir.join(RUNTIME_HOME_DIR_NAME), &home.files)?;
-    write_credential_symlinks(&temp_dir.join(RUNTIME_HOME_DIR_NAME), credential_symlinks)?;
-    write_build_plan(&temp_dir.join(BUILD_PLAN_FILE_NAME), plan)?;
+    write_fresh_build_or_cleanup(&temp_dir, plan, home, credential_symlinks)?;
 
     match fs::rename(&temp_dir, &paths.build_dir) {
         Ok(()) => Ok(ProfileBuildWriteStatus::Created),
@@ -53,6 +50,40 @@ pub(super) fn write_immutable_build(
             Err(source)
         }
     }
+}
+
+fn write_fresh_build_or_cleanup(
+    temp_dir: &Path,
+    plan: &ProfileBuildPlan,
+    home: &RuntimeHomeRenderResult,
+    credential_symlinks: &[CredentialSymlink],
+) -> io::Result<()> {
+    match write_fresh_build(temp_dir, plan, home, credential_symlinks) {
+        Ok(()) => Ok(()),
+        Err(source) => match remove_path_if_exists(temp_dir) {
+            Ok(()) => Err(source),
+            Err(cleanup) => Err(io::Error::new(
+                source.kind(),
+                format!(
+                    "{source}; additionally failed to clean up temporary build directory `{}`: {cleanup}",
+                    temp_dir.display()
+                ),
+            )),
+        },
+    }
+}
+
+fn write_fresh_build(
+    temp_dir: &Path,
+    plan: &ProfileBuildPlan,
+    home: &RuntimeHomeRenderResult,
+    credential_symlinks: &[CredentialSymlink],
+) -> io::Result<()> {
+    let home_dir = temp_dir.join(RUNTIME_HOME_DIR_NAME);
+    fs::create_dir_all(&home_dir)?;
+    write_runtime_home_files(&home_dir, &home.files)?;
+    write_credential_symlinks(&home_dir, credential_symlinks)?;
+    write_build_plan(&temp_dir.join(BUILD_PLAN_FILE_NAME), plan)
 }
 
 fn write_build_plan(path: &Path, plan: &ProfileBuildPlan) -> io::Result<()> {
