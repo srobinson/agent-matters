@@ -3,7 +3,9 @@ mod support;
 use std::fs;
 use std::path::Path;
 
-use agent_matters_capabilities::catalog::{LoadCatalogIndexRequest, load_or_refresh_catalog_index};
+use agent_matters_capabilities::catalog::{
+    LoadCatalogIndexRequest, catalog_index_path, load_or_refresh_catalog_index,
+};
 use agent_matters_capabilities::doctor::{DoctorIndexStatus, DoctorRequest, run_doctor};
 use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
 use tempfile::TempDir;
@@ -395,6 +397,45 @@ fn stale_generated_index_is_warning_only() {
         .expect("stale index diagnostic");
     assert_eq!(stale.severity, DiagnosticSeverity::Warning);
     assert!(!result.has_error_diagnostics());
+}
+
+#[test]
+fn corrupt_generated_index_is_error() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(index_path.parent().unwrap()).unwrap();
+    fs::write(&index_path, "{not valid json").unwrap();
+
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
+
+    assert_eq!(result.index.status, DoctorIndexStatus::Corrupt);
+    let corrupt = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "catalog.index-corrupt")
+        .expect("corrupt index diagnostic");
+    assert_eq!(corrupt.severity, DiagnosticSeverity::Error);
+    assert!(result.has_error_diagnostics());
+}
+
+#[test]
+fn unreadable_generated_index_is_error() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(&index_path).unwrap();
+
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
+
+    assert_eq!(result.index.status, DoctorIndexStatus::ReadFailed);
+    let read_failed = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "catalog.index-read-failed")
+        .expect("read failed index diagnostic");
+    assert_eq!(read_failed.severity, DiagnosticSeverity::Error);
+    assert!(result.has_error_diagnostics());
 }
 
 #[test]

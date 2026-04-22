@@ -191,7 +191,7 @@ fn index_stale(path: &Path, generated: &CatalogIndex, current: &CatalogIndex) ->
 
 fn index_corrupt(path: &Path, detail: &str) -> Diagnostic {
     Diagnostic::new(
-        DiagnosticSeverity::Warning,
+        DiagnosticSeverity::Error,
         "catalog.index-corrupt",
         format!(
             "generated catalog index `{}` is corrupt: {detail}",
@@ -204,7 +204,7 @@ fn index_corrupt(path: &Path, detail: &str) -> Diagnostic {
 
 fn index_read_failed(path: &Path, source: &io::Error) -> Diagnostic {
     Diagnostic::new(
-        DiagnosticSeverity::Warning,
+        DiagnosticSeverity::Error,
         "catalog.index-read-failed",
         format!(
             "failed to read generated catalog index `{}`: {source}",
@@ -212,6 +212,7 @@ fn index_read_failed(path: &Path, source: &io::Error) -> Diagnostic {
         ),
     )
     .with_location(DiagnosticLocation::manifest_path(path))
+    .with_recovery_hint("remove or fix the generated index path, then rerun doctor")
 }
 
 fn index_build_failed(error: &CatalogIndexError) -> Diagnostic {

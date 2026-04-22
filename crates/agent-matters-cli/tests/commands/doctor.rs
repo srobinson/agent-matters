@@ -1,5 +1,6 @@
 use std::fs;
 
+use agent_matters_capabilities::catalog::catalog_index_path;
 use predicates::str::contains;
 use tempfile::TempDir;
 
@@ -61,6 +62,47 @@ fn doctor_json_reports_structured_diagnostics_and_exit_code() {
         .stdout(contains("\"code\": \"catalog.manifest-invalid\""))
         .stdout(contains("\"code\": \"catalog.manifest-missing\""))
         .stdout(contains("\"code\": \"catalog.unknown-folder\""));
+}
+
+#[test]
+fn doctor_json_fails_on_corrupt_generated_index() {
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&state);
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(index_path.parent().unwrap()).unwrap();
+    fs::write(&index_path, "{not valid json").unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home)
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("\"status\": \"corrupt\""))
+        .stdout(contains("\"severity\": \"error\""))
+        .stdout(contains("\"code\": \"catalog.index-corrupt\""));
+}
+
+#[test]
+fn doctor_json_fails_on_unreadable_generated_index() {
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&state);
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(&index_path).unwrap();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home)
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("\"status\": \"read-failed\""))
+        .stdout(contains("\"severity\": \"error\""))
+        .stdout(contains("\"code\": \"catalog.index-read-failed\""));
 }
 
 #[test]
