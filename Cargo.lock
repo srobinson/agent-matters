@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agent-matters-capabilities"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agent-matters-core",
  "anyhow",
@@ -17,7 +17,7 @@ dependencies = [
 
 [[package]]
 name = "agent-matters-cli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agent-matters-capabilities",
  "agent-matters-core",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "agent-matters-core"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
