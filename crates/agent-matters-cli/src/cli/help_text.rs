@@ -8,12 +8,9 @@
 //! without changing how the constants are consumed by the clap modules.
 
 #[rustfmt::skip]
-pub const LONG_ABOUT: &str = "agent-matters compiles selected capabilities, instructions, hooks, \
-MCP servers, runtime settings, and launch material into focused runtime \
-homes for Codex, Claude, and future CLI runtimes.\n\n\
-Runtime homes (`.codex`, `.claude`) are generated rather than hand \
-maintained source of truth. Author capabilities and profiles once; compile \
-and activate them per runtime.";
+pub const LONG_ABOUT: &str =
+    "agent-matters manages generated runtime homes for agent CLI runtimes.\n\n\
+Find more information at: https://github.com/srobinson/agent-matters";
 
 #[rustfmt::skip]
 pub const PROFILES_LIST_AFTER_HELP: &str =
