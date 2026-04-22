@@ -12,4 +12,4 @@ pub mod cli;
 pub use cli::{Cli, Command, Runtime, dispatch};
 
 /// Crate version exposed for diagnostics and version banners.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("AGENT_MATTERS_VERSION");

@@ -1,19 +1,21 @@
 default:
     @just --list
 
-AGENT_MATTERS_LOCAL_BIN := env_var_or_default("AGENT_MATTERS_LOCAL_BIN", "/Users/alphab/Dev/LLM/DEV/helioy/agent-matters-worktrees/nancy-ALP-1960/target/release/agent-matters")
+AGENT_MATTERS_LOCAL_BIN := env_var_or_default("AGENT_MATTERS_LOCAL_BIN", "/Users/alphab/.cargo/bin/agent-matters")
 
 build:
     cargo build --workspace
+
+build-local:
+    AGENT_MATTERS_GIT_SHA="$(git rev-parse --short=7 HEAD)" cargo build --release -p agent-matters-cli
 
 release:
     cargo build --workspace --release
 
 install: release
-    cargo install --path crates/agent-matters-cli
+    cargo install --path crates/agent-matters-cli --force
 
-install-local:
-    cargo build --release -p agent-matters-cli
+install-local: build-local
     @set -eu; \
     src="$(pwd)/target/release/agent-matters"; \
     dest="{{AGENT_MATTERS_LOCAL_BIN}}"; \

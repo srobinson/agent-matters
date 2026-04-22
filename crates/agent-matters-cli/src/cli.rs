@@ -30,7 +30,7 @@ pub mod sources;
 #[derive(Debug, Parser)]
 #[command(
     name = "agent-matters",
-    version,
+    version = crate::VERSION,
     about = "Local first runtime profile system for Codex, Claude, and future CLI runtimes",
     long_about = help_text::LONG_ABOUT
 )]
