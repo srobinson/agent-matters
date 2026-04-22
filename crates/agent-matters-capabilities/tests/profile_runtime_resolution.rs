@@ -9,18 +9,10 @@ use tempfile::TempDir;
 
 mod support;
 
-fn copy_dir(src: &Path, dest: &Path) {
-    fs::create_dir_all(dest).unwrap();
-    for entry in fs::read_dir(src).unwrap() {
-        let entry = entry.unwrap();
-        let target = dest.join(entry.file_name());
-        if entry.file_type().unwrap().is_dir() {
-            copy_dir(&entry.path(), &target);
-        } else {
-            fs::copy(entry.path(), target).unwrap();
-        }
-    }
-}
+use support::fixtures::valid_catalog_repo;
+use support::manifests::{ProfileRuntimeFixture, set_profile_runtimes};
+
+const PROFILE_MANIFEST: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 fn write(root: &Path, rel: &str, body: &str) {
     let full = root.join(rel);
@@ -31,16 +23,7 @@ fn write(root: &Path, rel: &str, body: &str) {
 }
 
 fn valid_repo() -> TempDir {
-    let tmp = TempDir::new().unwrap();
-    copy_dir(&support::fixture_path("catalogs/valid"), tmp.path());
-    tmp
-}
-
-fn set_profile_runtimes(repo: &Path, runtimes: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let body = fs::read_to_string(&path).unwrap();
-    let prefix = body.split("[runtimes.codex]").next().unwrap();
-    fs::write(path, format!("{prefix}{runtimes}")).unwrap();
+    valid_catalog_repo()
 }
 
 fn resolve(repo: &Path, state: &Path) -> ResolveProfileResult {
@@ -107,10 +90,12 @@ fn runtime_precedence_applies_all_default_layers_and_profile_override() {
 
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-model = "profile-model"
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[ProfileRuntimeFixture::enabled_with_model(
+            "codex",
+            "profile-model",
+        )],
     );
     let profile_result = resolve(repo.path(), state.path());
     assert_eq!(
@@ -146,15 +131,12 @@ fn profile_default_wins_over_user_default() {
     write(state.path(), "config.toml", r#"default_runtime = "claude""#);
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes]
-default = "codex"
-
-[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        Some("codex"),
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
     );
 
     let result = resolve(repo.path(), state.path());
@@ -169,12 +151,9 @@ fn profile_default_must_be_enabled_for_the_profile() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes]
-default = "claude"
-
-[runtimes.codex]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        Some("claude"),
+        &[ProfileRuntimeFixture::enabled("codex")],
     );
 
     let result = resolve(repo.path(), state.path());
@@ -203,12 +182,12 @@ fn user_default_must_be_enabled_when_profile_runtime_is_ambiguous() {
     write(state.path(), "config.toml", r#"default_runtime = "zed""#);
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
     );
 
     let result = resolve(repo.path(), state.path());
@@ -236,12 +215,12 @@ fn ambiguous_runtime_without_default_is_error() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
     );
 
     let result = resolve(repo.path(), state.path());
@@ -263,13 +242,12 @@ fn disabled_runtime_block_is_ignored() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = false
-model = "ignored"
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::disabled_with_model("claude", "ignored"),
+        ],
     );
 
     let result = resolve(repo.path(), state.path());
@@ -285,9 +263,9 @@ fn unknown_enabled_runtime_is_diagnostic() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.zed]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[ProfileRuntimeFixture::enabled("zed")],
     );
 
     let result = resolve(repo.path(), state.path());

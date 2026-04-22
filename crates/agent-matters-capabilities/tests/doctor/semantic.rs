@@ -4,8 +4,11 @@ use agent_matters_capabilities::doctor::run_doctor;
 use agent_matters_core::domain::DiagnosticSeverity;
 use tempfile::TempDir;
 
-use crate::common::{append_requires, code_count, copy_dir, doctor_request, valid_repo};
-use crate::support::fixture_path;
+use crate::common::{
+    add_required_capability, add_required_env, code_count, copy_dir, doctor_request,
+    remove_profile_capability, valid_repo,
+};
+use crate::support::fixtures::fixture_path;
 
 #[test]
 fn missing_capability_file_reference_is_error() {
@@ -40,18 +43,16 @@ fn missing_capability_file_reference_is_error() {
 #[test]
 fn profile_missing_required_capability_is_error() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_capability(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "capabilities = [\"skill:playwright\"]\n",
+        "skill:playwright",
     );
-    let profile_manifest = repo
-        .path()
-        .join("profiles/renamed-profile-dir/manifest.toml");
-    let updated = fs::read_to_string(&profile_manifest)
-        .unwrap()
-        .replace("  \"skill:playwright\",\n", "");
-    fs::write(&profile_manifest, updated).unwrap();
+    remove_profile_capability(
+        repo.path(),
+        "profiles/renamed-profile-dir/manifest.toml",
+        "skill:playwright",
+    );
     let state = TempDir::new().unwrap();
 
     let result = run_doctor(doctor_request(&repo, &state)).unwrap();
@@ -70,10 +71,10 @@ fn profile_missing_required_capability_is_error() {
 #[test]
 fn missing_required_env_is_warning_without_values() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_env(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"AGENT_MATTERS_DOCTOR_TEST_MISSING_ENV\"]\n",
+        "AGENT_MATTERS_DOCTOR_TEST_MISSING_ENV",
     );
     let state = TempDir::new().unwrap();
 

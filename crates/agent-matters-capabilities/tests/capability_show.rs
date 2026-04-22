@@ -9,7 +9,7 @@ use agent_matters_core::domain::Diagnostic;
 use serde_json::json;
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::fixture_path;
 
 fn has_code(diagnostics: &[Diagnostic], code: &str) -> bool {
     diagnostics.iter().any(|diagnostic| diagnostic.code == code)

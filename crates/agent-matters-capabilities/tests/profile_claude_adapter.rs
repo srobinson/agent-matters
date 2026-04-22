@@ -12,31 +12,23 @@ use agent_matters_core::domain::DiagnosticSeverity;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::valid_catalog_repo;
+use support::manifests::{
+    ProfileRuntimeFixture, add_capability_file_mapping, set_capability_runtime_support,
+    set_profile_runtimes,
+};
+use support::native_home::native_home_with_claude_auth;
 
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
+const PROFILE_MANIFEST: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
+    let repo = valid_catalog_repo();
     add_claude_support(repo.path());
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[ProfileRuntimeFixture::enabled("claude")],
     );
     repo
 }
@@ -62,17 +54,6 @@ fn use_request(repo: &Path, state: &Path, workspace: &Path) -> UseProfileRequest
         workspace_path: Some(workspace.to_path_buf()),
         env: BTreeMap::new(),
     }
-}
-
-fn native_home_with_claude_auth(root: &Path) -> PathBuf {
-    let home = root.join("native-home");
-    fs::create_dir_all(home.join(".claude")).unwrap();
-    fs::write(
-        home.join(".claude/.credentials.json"),
-        br#"{"claude":"test"}"#,
-    )
-    .unwrap();
-    home
 }
 
 #[test]
@@ -140,10 +121,12 @@ fn compile_writes_claude_model_settings() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.claude]
-enabled = true
-model = "claude-sonnet-4.5"
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[ProfileRuntimeFixture::enabled_with_model(
+            "claude",
+            "claude-sonnet-4.5",
+        )],
     );
 
     let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
@@ -218,14 +201,12 @@ fn compile_reports_unsupported_claude_file_mapping() {
         "extra\n",
     )
     .unwrap();
-    let manifest = repo
-        .path()
-        .join("catalog/skills/renamed-skill-dir/manifest.toml");
-    let updated = fs::read_to_string(&manifest).unwrap().replace(
-        "[files]\nsource = \"SKILL.md\"",
-        "[files]\nsource = \"SKILL.md\"\nreadme = \"README.md\"",
+    add_capability_file_mapping(
+        repo.path(),
+        "catalog/skills/renamed-skill-dir/manifest.toml",
+        "readme",
+        "README.md",
     );
-    fs::write(manifest, updated).unwrap();
 
     let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
 
@@ -262,13 +243,6 @@ fn use_profile_launch_instructions_have_claude_shape() {
     );
 }
 
-fn set_profile_runtimes(repo: &Path, runtimes: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let body = fs::read_to_string(&path).unwrap();
-    let prefix = body.split("[runtimes.").next().unwrap();
-    fs::write(path, format!("{prefix}{runtimes}")).unwrap();
-}
-
 fn add_claude_support(repo: &Path) {
     for manifest in [
         "catalog/agents/github-researcher/manifest.toml",
@@ -278,9 +252,6 @@ fn add_claude_support(repo: &Path) {
         "catalog/runtime-settings/codex-defaults/manifest.toml",
         "catalog/skills/renamed-skill-dir/manifest.toml",
     ] {
-        let path = repo.join(manifest);
-        let mut updated = fs::read_to_string(&path).unwrap();
-        updated.push_str("\n[runtimes.claude]\nsupported = true\n");
-        fs::write(path, updated).unwrap();
+        set_capability_runtime_support(repo, manifest, "claude", true);
     }
 }

@@ -4,7 +4,7 @@ use agent_matters_core::domain::DiagnosticSeverity;
 use tempfile::TempDir;
 
 use crate::common::{code_count, run_fixture};
-use crate::support::fixture_path;
+use crate::support::fixtures::fixture_path;
 
 #[test]
 fn clean_catalog_with_fresh_index_passes_without_diagnostics() {

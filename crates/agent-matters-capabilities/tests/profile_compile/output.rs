@@ -5,7 +5,7 @@ use agent_matters_capabilities::profiles::compile_profile_build;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use crate::common::{append_requires, compile, compile_request, file_snapshot, valid_repo};
+use crate::common::{add_required_env, compile, compile_request, file_snapshot, valid_repo};
 
 #[test]
 fn compile_does_not_mutate_authored_catalog_files() {
@@ -22,10 +22,10 @@ fn compile_does_not_mutate_authored_catalog_files() {
 fn compile_json_output_does_not_include_env_values() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
-    append_requires(
+    add_required_env(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
     let mut request = compile_request(repo.path(), state.path());
     let native_home = request.native_home_dir.clone().unwrap();

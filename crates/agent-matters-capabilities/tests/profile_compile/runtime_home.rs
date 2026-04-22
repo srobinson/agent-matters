@@ -6,7 +6,8 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 use crate::common::{
-    BuildPathAssertions, compile, compile_request, set_profile_runtimes, valid_repo,
+    BuildPathAssertions, PROFILE_MANIFEST, ProfileRuntimeFixture, add_capability_file_mapping,
+    compile, compile_request, set_profile_runtimes, valid_repo,
 };
 
 #[test]
@@ -87,10 +88,11 @@ fn compile_writes_codex_model_config() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-model = "gpt-5.4"
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[ProfileRuntimeFixture::enabled_with_model(
+            "codex", "gpt-5.4",
+        )],
     );
 
     let build = compile(repo.path(), state.path()).build.unwrap();
@@ -111,14 +113,12 @@ fn compile_reports_unsupported_codex_file_mapping() {
         "extra\n",
     )
     .unwrap();
-    let manifest = repo
-        .path()
-        .join("catalog/skills/renamed-skill-dir/manifest.toml");
-    let updated = fs::read_to_string(&manifest).unwrap().replace(
-        "[files]\nsource = \"SKILL.md\"",
-        "[files]\nsource = \"SKILL.md\"\nreadme = \"README.md\"",
+    add_capability_file_mapping(
+        repo.path(),
+        "catalog/skills/renamed-skill-dir/manifest.toml",
+        "readme",
+        "README.md",
     );
-    fs::write(manifest, updated).unwrap();
 
     let result = compile_profile_build(compile_request(repo.path(), state.path())).unwrap();
 

@@ -1,32 +1,20 @@
 mod support;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use agent_matters_capabilities::doctor::{DoctorIndexStatus, DoctorRequest, run_doctor};
 use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::valid_catalog_repo;
+use support::manifests::{ProfileRuntimeFixture, set_profile_runtimes};
+use support::native_home::native_home_with_codex_auth;
 
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
+const PROFILE_MANIFEST: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    repo
+    valid_catalog_repo()
 }
 
 fn doctor_request(repo: &TempDir, state: &TempDir) -> DoctorRequest {
@@ -47,13 +35,6 @@ fn doctor_request_with_native_home(
         user_state_dir: state.path().to_path_buf(),
         native_home_dir: Some(native_home),
     }
-}
-
-fn native_home_with_codex_auth(root: &Path) -> PathBuf {
-    let home = root.join("native-home");
-    fs::create_dir_all(home.join(".codex")).unwrap();
-    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
-    home
 }
 
 fn diagnostic_with_code<'a>(diagnostics: &'a [Diagnostic], code: &str) -> &'a Diagnostic {
@@ -95,12 +76,15 @@ fn missing_codex_auth_is_warning() {
 #[test]
 fn missing_claude_credentials_is_warning() {
     let repo = valid_repo();
-    let profile_manifest = repo
-        .path()
-        .join("profiles/renamed-profile-dir/manifest.toml");
-    let mut updated = fs::read_to_string(&profile_manifest).unwrap();
-    updated.push_str("\n[runtimes.claude]\nenabled = true\n");
-    fs::write(&profile_manifest, updated).unwrap();
+    set_profile_runtimes(
+        repo.path(),
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
+    );
     let state = TempDir::new().unwrap();
     let native_home = native_home_with_codex_auth(state.path());
     fs::create_dir_all(native_home.join(".claude")).unwrap();

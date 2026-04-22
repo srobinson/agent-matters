@@ -5,7 +5,7 @@ use std::fs;
 use agent_matters_core::domain::{CapabilityKind, ProfileKind};
 use agent_matters_core::manifest::{CapabilityManifest, InstructionMarkers, ProfileManifest};
 
-use support::fixture_path;
+use support::fixtures::fixture_path;
 
 fn read_fixture(relative: &str) -> String {
     fs::read_to_string(fixture_path(relative)).unwrap()

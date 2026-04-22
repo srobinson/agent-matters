@@ -11,7 +11,7 @@ use agent_matters_core::domain::Diagnostic;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::fixture_path;
 
 fn copy_dir(from: &Path, to: &Path) {
     fs::create_dir_all(to).unwrap();

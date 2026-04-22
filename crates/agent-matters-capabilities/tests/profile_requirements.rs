@@ -2,7 +2,6 @@ mod support;
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
 
 use agent_matters_capabilities::profiles::{
     ProfileRequirementValidationMode, RequirementPresence, ResolveProfileRequest,
@@ -11,21 +10,8 @@ use agent_matters_capabilities::profiles::{
 use agent_matters_core::domain::{DiagnosticSeverity, EnvVarPresence};
 use tempfile::TempDir;
 
-use support::fixture_path;
-
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
+use support::fixtures::valid_catalog_repo;
+use support::manifests::{add_required_capability, add_required_env};
 
 fn resolve_and_validate(
     repo: &TempDir,
@@ -44,26 +30,16 @@ fn resolve_and_validate(
 }
 
 fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    repo
-}
-
-fn append_requires(repo: &TempDir, manifest: &str, body: &str) {
-    let path = repo.path().join(manifest);
-    let mut updated = fs::read_to_string(&path).unwrap();
-    updated.push_str("\n[requires]\n");
-    updated.push_str(body);
-    fs::write(path, updated).unwrap();
+    valid_catalog_repo()
 }
 
 #[test]
 fn required_capability_present_reports_present_check() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_capability(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "capabilities = [\"skill:playwright\"]\n",
+        "skill:playwright",
     );
 
     let result = resolve_and_validate(
@@ -85,10 +61,10 @@ fn required_capability_present_reports_present_check() {
 #[test]
 fn required_capability_missing_is_error_with_requiring_capability() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_capability(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "capabilities = [\"mcp:context-matters\"]\n",
+        "mcp:context-matters",
     );
 
     let result = resolve_and_validate(
@@ -122,10 +98,10 @@ fn required_capability_missing_is_error_with_requiring_capability() {
 #[test]
 fn required_env_present_reports_status_without_value() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_env(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
     let env = BTreeMap::from([(
         "LINEAR_API_KEY".to_string(),
@@ -147,10 +123,10 @@ fn required_env_present_reports_status_without_value() {
 #[test]
 fn required_env_missing_during_compile_is_warning() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_env(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
 
     let result = resolve_and_validate(
@@ -169,10 +145,10 @@ fn required_env_missing_during_compile_is_warning() {
 #[test]
 fn required_env_missing_during_use_is_error() {
     let repo = valid_repo();
-    append_requires(
-        &repo,
+    add_required_env(
+        repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
 
     let result = resolve_and_validate(
@@ -198,11 +174,12 @@ fn dependency_validation_uses_overlaid_effective_capability() {
             .join("catalog/skills/renamed-skill-dir/manifest.toml"),
     )
     .unwrap();
-    fs::write(
-        overlay_dir.join("manifest.toml"),
-        format!("{base}\n[requires]\ncapabilities = [\"mcp:linear\"]\n"),
-    )
-    .unwrap();
+    fs::write(overlay_dir.join("manifest.toml"), base).unwrap();
+    add_required_capability(
+        repo.path(),
+        "overlays/skills/playwright/manifest.toml",
+        "mcp:linear",
+    );
 
     let result = resolve_and_validate(
         &repo,

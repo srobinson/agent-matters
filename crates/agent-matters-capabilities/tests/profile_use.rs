@@ -1,37 +1,26 @@
+mod support;
+
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use agent_matters_capabilities::profiles::{UseProfileRequest, use_profile};
-use agent_matters_core::domain::DiagnosticSeverity;
+use agent_matters_core::domain::{DiagnosticSeverity, ScopeConstraints, ScopeEnforcement};
 use serde_json::json;
 use tempfile::TempDir;
 
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
-
-fn fixture_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
-        .join(relative)
-}
+use support::fixtures::valid_catalog_repo;
+use support::manifests::{
+    ProfileRuntimeFixture, add_required_env, set_capability_runtime_support, set_profile_runtimes,
+    set_profile_scope,
+};
+use support::native_home::native_home_with_codex_auth;
 
 fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    repo
+    valid_catalog_repo()
 }
+
+const PROFILE_MANIFEST: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 fn use_request(repo: &Path, state: &Path, workspace: &Path) -> UseProfileRequest {
     UseProfileRequest {
@@ -43,13 +32,6 @@ fn use_request(repo: &Path, state: &Path, workspace: &Path) -> UseProfileRequest
         workspace_path: Some(workspace.to_path_buf()),
         env: BTreeMap::new(),
     }
-}
-
-fn native_home_with_codex_auth(root: &Path) -> PathBuf {
-    let home = root.join("native-home");
-    fs::create_dir_all(home.join(".codex")).unwrap();
-    fs::write(home.join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
-    home
 }
 
 #[test]
@@ -118,10 +100,10 @@ fn use_profile_missing_required_env_blocks_build() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
-    append_requires(
+    add_required_env(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
 
     let result = use_profile(use_request(repo.path(), state.path(), workspace.path())).unwrap();
@@ -139,12 +121,14 @@ fn use_profile_scope_fail_blocks_out_of_scope_path() {
     let allowed = repo.path().join("allowed");
     fs::create_dir_all(&allowed).unwrap();
     let outside = TempDir::new().unwrap();
-    append_profile_scope(
+    set_profile_scope(
         repo.path(),
-        &format!(
-            "[scope]\npaths = [\"{}\"]\nenforcement = \"fail\"\n",
-            allowed.display()
-        ),
+        PROFILE_MANIFEST,
+        ScopeConstraints {
+            paths: vec![allowed.display().to_string()],
+            github_repos: Vec::new(),
+            enforcement: ScopeEnforcement::Fail,
+        },
     );
 
     let result = use_profile(use_request(repo.path(), state.path(), outside.path())).unwrap();
@@ -159,7 +143,15 @@ fn use_profile_scope_fail_without_targets_blocks_build() {
     let repo = valid_repo();
     let state = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
-    append_profile_scope(repo.path(), "[scope]\nenforcement = \"fail\"\n");
+    set_profile_scope(
+        repo.path(),
+        PROFILE_MANIFEST,
+        ScopeConstraints {
+            paths: Vec::new(),
+            github_repos: Vec::new(),
+            enforcement: ScopeEnforcement::Fail,
+        },
+    );
 
     let result = use_profile(use_request(repo.path(), state.path(), workspace.path())).unwrap();
 
@@ -177,12 +169,12 @@ fn use_profile_ambiguous_runtime_fails_without_flag() {
     add_claude_support(repo.path());
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
     );
     let mut request = use_request(repo.path(), state.path(), workspace.path());
     request.runtime = None;
@@ -197,29 +189,6 @@ enabled = true
     );
 }
 
-fn append_requires(repo: &Path, manifest: &str, body: &str) {
-    let path = repo.join(manifest);
-    let mut updated = fs::read_to_string(&path).unwrap();
-    updated.push_str("\n[requires]\n");
-    updated.push_str(body);
-    fs::write(path, updated).unwrap();
-}
-
-fn append_profile_scope(repo: &Path, scope: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let mut updated = fs::read_to_string(&path).unwrap();
-    updated.push('\n');
-    updated.push_str(scope);
-    fs::write(path, updated).unwrap();
-}
-
-fn set_profile_runtimes(repo: &Path, runtimes: &str) {
-    let path = repo.join("profiles/renamed-profile-dir/manifest.toml");
-    let body = fs::read_to_string(&path).unwrap();
-    let prefix = body.split("[runtimes.codex]").next().unwrap();
-    fs::write(path, format!("{prefix}{runtimes}")).unwrap();
-}
-
 fn add_claude_support(repo: &Path) {
     for manifest in [
         "catalog/agents/github-researcher/manifest.toml",
@@ -229,9 +198,6 @@ fn add_claude_support(repo: &Path) {
         "catalog/runtime-settings/codex-defaults/manifest.toml",
         "catalog/skills/renamed-skill-dir/manifest.toml",
     ] {
-        let path = repo.join(manifest);
-        let mut updated = fs::read_to_string(&path).unwrap();
-        updated.push_str("\n[runtimes.claude]\nsupported = true\n");
-        fs::write(path, updated).unwrap();
+        set_capability_runtime_support(repo, manifest, "claude", true);
     }
 }

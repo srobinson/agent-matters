@@ -7,40 +7,32 @@ use agent_matters_capabilities::profiles::{
     ProfileScopeValidationRequest, ProfileScopeValidationStatus, ProfileUseScopeValidationRequest,
     ResolveProfileRequest, validate_profile_scope, validate_profile_use_scope,
 };
-use agent_matters_core::domain::DiagnosticSeverity;
+use agent_matters_core::domain::{DiagnosticSeverity, ScopeConstraints, ScopeEnforcement};
 use serde_json::json;
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::valid_catalog_repo;
+use support::manifests::set_profile_scope;
 
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
+const PROFILE_MANIFEST: &str = "profiles/renamed-profile-dir/manifest.toml";
 
 fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    repo
+    valid_catalog_repo()
 }
 
-fn set_scope(repo: &TempDir, scope: &str) {
-    let path = repo
-        .path()
-        .join("profiles/renamed-profile-dir/manifest.toml");
-    let mut body = fs::read_to_string(&path).unwrap();
-    body.push_str("\n[scope]\n");
-    body.push_str(scope);
-    fs::write(path, body).unwrap();
+fn set_scope(repo: &TempDir, paths: &[&str], github_repos: &[&str], enforcement: ScopeEnforcement) {
+    set_profile_scope(
+        repo.path(),
+        PROFILE_MANIFEST,
+        ScopeConstraints {
+            paths: paths.iter().map(|path| (*path).to_string()).collect(),
+            github_repos: github_repos
+                .iter()
+                .map(|repo| (*repo).to_string())
+                .collect(),
+            enforcement,
+        },
+    );
 }
 
 fn resolve(repo: &TempDir) -> agent_matters_capabilities::profiles::ResolveProfileResult {
@@ -78,11 +70,7 @@ fn omitted_scope_without_targets_remains_unrestricted() {
 #[test]
 fn scope_enforcement_none_without_targets_remains_unrestricted() {
     let repo = valid_repo();
-    set_scope(
-        &repo,
-        r#"enforcement = "none"
-"#,
-    );
+    set_scope(&repo, &[], &[], ScopeEnforcement::None);
 
     let result = validate(&repo, repo.path());
 
@@ -93,11 +81,7 @@ fn scope_enforcement_none_without_targets_remains_unrestricted() {
 #[test]
 fn scope_enforcement_warn_without_targets_reports_warning() {
     let repo = valid_repo();
-    set_scope(
-        &repo,
-        r#"enforcement = "warn"
-"#,
-    );
+    set_scope(&repo, &[], &[], ScopeEnforcement::Warn);
 
     let result = validate(&repo, repo.path());
     let diagnostic = result.diagnostics.first().unwrap();
@@ -114,11 +98,7 @@ fn scope_enforcement_warn_without_targets_reports_warning() {
 fn scope_enforcement_warn_without_targets_keeps_missing_path_error() {
     let repo = valid_repo();
     let workspace = repo.path().join("missing");
-    set_scope(
-        &repo,
-        r#"enforcement = "warn"
-"#,
-    );
+    set_scope(&repo, &[], &[], ScopeEnforcement::Warn);
 
     let result = validate(&repo, &workspace);
     let diagnostic = result.diagnostics.first().unwrap();
@@ -138,11 +118,7 @@ fn scope_enforcement_warn_without_targets_keeps_missing_path_error() {
 #[test]
 fn scope_enforcement_fail_without_targets_reports_error() {
     let repo = valid_repo();
-    set_scope(
-        &repo,
-        r#"enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &[], &[], ScopeEnforcement::Fail);
 
     let result = validate(&repo, repo.path());
     let diagnostic = result.diagnostics.first().unwrap();
@@ -159,11 +135,7 @@ fn scope_enforcement_fail_without_targets_reports_error() {
 fn scope_enforcement_fail_without_targets_reports_error_before_missing_path() {
     let repo = valid_repo();
     let workspace = repo.path().join("missing");
-    set_scope(
-        &repo,
-        r#"enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &[], &[], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -187,12 +159,7 @@ fn path_in_scope_passes() {
     let allowed = repo.path().join("allowed");
     let workspace = allowed.join("nested");
     fs::create_dir_all(&workspace).unwrap();
-    set_scope(
-        &repo,
-        r#"paths = ["allowed"]
-enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &["allowed"], &[], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -207,12 +174,7 @@ fn path_out_of_scope_warns() {
     fs::create_dir_all(repo.path().join("allowed")).unwrap();
     let workspace = repo.path().join("outside");
     fs::create_dir_all(&workspace).unwrap();
-    set_scope(
-        &repo,
-        r#"paths = ["allowed"]
-enforcement = "warn"
-"#,
-    );
+    set_scope(&repo, &["allowed"], &[], ScopeEnforcement::Warn);
 
     let result = validate(&repo, &workspace);
     let diagnostic = result.diagnostics.first().unwrap();
@@ -232,12 +194,7 @@ fn path_out_of_scope_fails() {
     fs::create_dir_all(repo.path().join("allowed")).unwrap();
     let workspace = repo.path().join("outside");
     fs::create_dir_all(&workspace).unwrap();
-    set_scope(
-        &repo,
-        r#"paths = ["allowed"]
-enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &["allowed"], &[], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -252,12 +209,7 @@ fn scope_enforcement_none_records_no_warning_or_failure() {
     fs::create_dir_all(repo.path().join("allowed")).unwrap();
     let workspace = repo.path().join("outside");
     fs::create_dir_all(&workspace).unwrap();
-    set_scope(
-        &repo,
-        r#"paths = ["allowed"]
-enforcement = "none"
-"#,
-    );
+    set_scope(&repo, &["allowed"], &[], ScopeEnforcement::None);
 
     let result = validate(&repo, &workspace);
 
@@ -279,12 +231,7 @@ fn github_repo_scope_passes_when_origin_matches() {
 "#,
     )
     .unwrap();
-    set_scope(
-        &repo,
-        r#"github_repos = ["srobinson/helioy"]
-enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &[], &["srobinson/helioy"], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -314,12 +261,7 @@ fn non_origin_github_remote_does_not_satisfy_repo_scope() {
 "#,
     )
     .unwrap();
-    set_scope(
-        &repo,
-        r#"github_repos = ["srobinson/helioy"]
-enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &[], &["srobinson/helioy"], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -333,13 +275,8 @@ enforcement = "fail"
 fn omitted_use_path_defaults_to_current_working_directory() {
     let repo = valid_repo();
     let cwd = std::env::current_dir().unwrap();
-    set_scope(
-        &repo,
-        &format!(
-            "paths = [\"{}\"]\nenforcement = \"fail\"\n",
-            cwd.to_string_lossy()
-        ),
-    );
+    let cwd_scope = cwd.to_string_lossy().to_string();
+    set_scope(&repo, &[cwd_scope.as_str()], &[], ScopeEnforcement::Fail);
     let resolved = resolve(&repo);
 
     let result = validate_profile_use_scope(ProfileUseScopeValidationRequest {
@@ -361,12 +298,7 @@ fn nonexistent_path_reports_diagnostic() {
     let repo = valid_repo();
     fs::create_dir_all(repo.path().join("allowed")).unwrap();
     let workspace = repo.path().join("missing");
-    set_scope(
-        &repo,
-        r#"paths = ["allowed"]
-enforcement = "fail"
-"#,
-    );
+    set_scope(&repo, &["allowed"], &[], ScopeEnforcement::Fail);
 
     let result = validate(&repo, &workspace);
 
@@ -385,10 +317,9 @@ fn scope_validation_json_includes_status_path_and_allowed_scopes() {
     fs::create_dir_all(&workspace).unwrap();
     set_scope(
         &repo,
-        r#"paths = ["allowed"]
-github_repos = ["srobinson/helioy"]
-enforcement = "warn"
-"#,
+        &["allowed"],
+        &["srobinson/helioy"],
+        ScopeEnforcement::Warn,
     );
 
     let result = validate(&repo, &workspace);

@@ -2,7 +2,7 @@
 
 Fixtures are static input files used by integration tests under
 `crates/agent-matters-capabilities/tests/`. Load them with the
-`support::fixture_path` helper so the path stays relative to this
+`support::fixtures::fixture_path` helper so the path stays relative to this
 directory regardless of where cargo is invoked from.
 
 ## Layout

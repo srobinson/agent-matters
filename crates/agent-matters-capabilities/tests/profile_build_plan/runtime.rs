@@ -1,7 +1,10 @@
 use agent_matters_capabilities::profiles::{adapter_for_runtime, plan_profile_build};
 use tempfile::TempDir;
 
-use crate::common::{build_plan_request, plan, set_profile_runtimes, valid_repo};
+use crate::common::{
+    PROFILE_MANIFEST, ProfileRuntimeFixture, build_plan_request, plan, set_profile_runtimes,
+    valid_repo,
+};
 
 #[test]
 fn adapter_version_is_read_from_registered_runtime_adapter() {
@@ -21,12 +24,12 @@ fn requested_runtime_bypasses_default_runtime_ambiguity() {
     let state = TempDir::new().unwrap();
     set_profile_runtimes(
         repo.path(),
-        r#"[runtimes.codex]
-enabled = true
-
-[runtimes.claude]
-enabled = true
-"#,
+        PROFILE_MANIFEST,
+        None,
+        &[
+            ProfileRuntimeFixture::enabled("codex"),
+            ProfileRuntimeFixture::enabled("claude"),
+        ],
     );
 
     let result = plan_profile_build(build_plan_request(repo.path(), state.path())).unwrap();

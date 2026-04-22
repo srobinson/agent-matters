@@ -9,7 +9,7 @@ use agent_matters_capabilities::profiles::{
 use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
 use tempfile::TempDir;
 
-use support::fixture_path;
+use support::fixtures::fixture_path;
 
 fn copy_dir(from: &Path, to: &Path) {
     fs::create_dir_all(to).unwrap();

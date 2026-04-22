@@ -8,7 +8,7 @@ use agent_matters_core::domain::DiagnosticSeverity;
 use tempfile::TempDir;
 
 use crate::common::{copy_dir, doctor_request, valid_repo};
-use crate::support::fixture_path;
+use crate::support::fixtures::fixture_path;
 
 #[test]
 fn stale_generated_index_is_warning_only() {
