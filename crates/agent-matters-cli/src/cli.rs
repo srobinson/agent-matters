@@ -157,25 +157,14 @@ pub(crate) fn render_runtime_names(
 }
 
 pub(crate) fn emit_diagnostics(diagnostics: &[agent_matters_core::domain::Diagnostic]) {
-    for diagnostic in diagnostics {
-        eprintln!(
-            "{} {}: {}",
-            diagnostic_severity(diagnostic.severity),
-            diagnostic.code,
-            diagnostic.message
-        );
-        if let Some(hint) = &diagnostic.recovery_hint {
-            eprintln!("  hint: {hint}");
-        }
+    if diagnostics.is_empty() {
+        return;
     }
-}
 
-fn diagnostic_severity(severity: agent_matters_core::domain::DiagnosticSeverity) -> &'static str {
-    match severity {
-        agent_matters_core::domain::DiagnosticSeverity::Info => "info",
-        agent_matters_core::domain::DiagnosticSeverity::Warning => "warning",
-        agent_matters_core::domain::DiagnosticSeverity::Error => "error",
-    }
+    eprint!(
+        "{}",
+        agent_matters_core::domain::render_diagnostics_human(diagnostics)
+    );
 }
 
 #[cfg(test)]

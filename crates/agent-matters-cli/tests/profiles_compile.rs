@@ -191,7 +191,8 @@ fn profiles_compile_human_output_includes_missing_env_warning() {
         .success()
         .stdout(contains("Warnings:"))
         .stdout(contains("profile.required-env-missing"))
-        .stderr(contains("warning profile.required-env-missing"));
+        .stderr(contains("Warnings:"))
+        .stderr(contains("profile.required-env-missing"));
 }
 
 #[test]

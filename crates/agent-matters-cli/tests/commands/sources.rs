@@ -113,6 +113,7 @@ fn sources_import_json_reports_policy_diagnostic() {
         .assert()
         .failure()
         .code(1)
+        .stdout(contains("\"diagnostics\""))
         .stdout(contains("\"code\": \"source.trust-blocked\""))
         .stdout(contains("skills.sh"))
         .stdout(contains("skill"));

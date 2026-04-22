@@ -298,8 +298,8 @@ enforcement = "warn"
                     workspace.to_string_lossy()
                 ),
                 "location": {
-                    "manifest_path": "profiles/renamed-profile-dir/manifest.toml",
-                    "field": "scope"
+                    "source_path": "profiles/renamed-profile-dir/manifest.toml",
+                    "field_path": "scope"
                 },
                 "recovery_hint": "use a path inside the allowed scope or update the profile manifest"
             }]

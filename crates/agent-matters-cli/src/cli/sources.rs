@@ -7,6 +7,7 @@ use std::path::Path;
 use agent_matters_capabilities::sources::{
     ImportSourceRequest, SearchSourceRequest, import_source, search_source,
 };
+use agent_matters_core::domain::DiagnosticReport;
 use clap::Subcommand;
 
 use super::{default_catalog_paths, emit_diagnostics, generated_help, help_text};
@@ -74,7 +75,11 @@ fn run_search(source: &str, query: &str, json: bool) -> anyhow::Result<i32> {
         Err(err) => {
             let diagnostic = err.to_diagnostic();
             if json {
-                println!("{}", serde_json::to_string_pretty(&vec![diagnostic])?);
+                let diagnostics = vec![diagnostic];
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&DiagnosticReport::new(&diagnostics))?
+                );
             } else {
                 emit_diagnostics(&[diagnostic]);
             }
@@ -110,7 +115,11 @@ fn run_import(locator: &str, json: bool) -> anyhow::Result<i32> {
         Err(err) => {
             let diagnostic = err.to_diagnostic();
             if json {
-                println!("{}", serde_json::to_string_pretty(&vec![diagnostic])?);
+                let diagnostics = vec![diagnostic];
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&DiagnosticReport::new(&diagnostics))?
+                );
             } else {
                 emit_diagnostics(&[diagnostic]);
             }
