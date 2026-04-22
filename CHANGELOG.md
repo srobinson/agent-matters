@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/srobinson/agent-matters/compare/v0.1.2...v0.1.3) (2026-04-22)
+
+
+### Bug Fixes
+
+* remove generated help subcommand ([e7bde1b](https://github.com/srobinson/agent-matters/commit/e7bde1be8b5fc8808b82aa4b21ff8da755adb171))
+
 ## [0.1.2](https://github.com/srobinson/agent-matters/compare/v0.1.1...v0.1.2) (2026-04-22)
 
 
