@@ -1,0 +1,32 @@
+{
+  "name": "agent-matters",
+  "version": "0.1.1",
+  "description": "CLI for agent-matters runtime profiles",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/srobinson/agent-matters.git"
+  },
+  "homepage": "https://github.com/srobinson/agent-matters",
+  "keywords": [
+    "agent",
+    "ai",
+    "cli",
+    "runtime",
+    "profiles",
+    "mcp"
+  ],
+  "bin": {
+    "agent-matters": "bin/agent-matters"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "bin/agent-matters",
+    "scripts/install.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

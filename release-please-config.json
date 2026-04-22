@@ -12,6 +12,11 @@
           "type": "toml",
           "path": "Cargo.toml",
           "jsonpath": "$.workspace.package.version"
+        },
+        {
+          "type": "json",
+          "path": "npm/agent-matters/package.json",
+          "jsonpath": "$.version"
         }
       ],
       "changelog-sections": [

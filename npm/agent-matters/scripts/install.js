@@ -1,0 +1,160 @@
+#!/usr/bin/env node
+
+"use strict";
+
+const { execSync } = require("child_process");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+const http = require("http");
+
+const REPO = "srobinson/agent-matters";
+const BIN_NAME = "agent-matters";
+// Archive filenames come from the Rust crate name. The extracted binary keeps
+// its [[bin]] name.
+const ARCHIVE_PREFIX = "agent-matters-cli";
+
+const PLATFORM_MAP = {
+  "darwin-arm64": "aarch64-apple-darwin",
+  "darwin-x64": "x86_64-apple-darwin",
+  "linux-arm64": "aarch64-unknown-linux-gnu",
+  "linux-x64": "x86_64-unknown-linux-gnu",
+};
+
+function getPlatformKey() {
+  const platform = process.platform;
+  const arch = process.arch;
+  return `${platform}-${arch}`;
+}
+
+function getTarget() {
+  const key = getPlatformKey();
+  const target = PLATFORM_MAP[key];
+  if (!target) {
+    console.error(
+      `Unsupported platform: ${key}\n` +
+        `Supported: ${Object.keys(PLATFORM_MAP).join(", ")}`,
+    );
+    process.exit(1);
+  }
+  return target;
+}
+
+function getVersion() {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+  );
+  return pkg.version;
+}
+
+function fetch(url) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith("https") ? https : http;
+    mod
+      .get(
+        url,
+        { headers: { "User-Agent": "agent-matters-installer" } },
+        (res) => {
+          if (
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            return fetch(res.headers.location).then(resolve, reject);
+          }
+          if (res.statusCode !== 200) {
+            return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+          }
+          const chunks = [];
+          res.on("data", (chunk) => chunks.push(chunk));
+          res.on("end", () => resolve(Buffer.concat(chunks)));
+          res.on("error", reject);
+        },
+      )
+      .on("error", reject);
+  });
+}
+
+function computeSha256(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+async function verifySha256(tarball, artifact, version) {
+  const sumUrl = `https://github.com/${REPO}/releases/download/v${version}/${artifact}.sha256`;
+  try {
+    const sumData = await fetch(sumUrl);
+    const sumText = sumData.toString("utf8").trim();
+    const expectedHash = sumText.split(/\s+/)[0];
+
+    if (!expectedHash || !/^[0-9a-f]{64}$/i.test(expectedHash)) {
+      console.warn(
+        `Warning: ${artifact}.sha256 malformed, skipping verification`,
+      );
+      return true;
+    }
+
+    const actualHash = computeSha256(tarball);
+    if (actualHash.toLowerCase() !== expectedHash.toLowerCase()) {
+      console.error(
+        `SHA-256 mismatch for ${artifact}:\n` +
+          `  expected: ${expectedHash}\n` +
+          `  actual:   ${actualHash}`,
+      );
+      return false;
+    }
+
+    console.log(`SHA-256 verified: ${actualHash.slice(0, 16)}...`);
+    return true;
+  } catch (err) {
+    console.warn(
+      `Warning: could not fetch ${artifact}.sha256 (${err.message}), skipping verification`,
+    );
+    return true;
+  }
+}
+
+async function install() {
+  const target = getTarget();
+  const version = getVersion();
+  const artifact = `${ARCHIVE_PREFIX}-${target}.tar.gz`;
+  const url = `https://github.com/${REPO}/releases/download/v${version}/${artifact}`;
+
+  const binDir = path.join(__dirname, "..", "bin");
+  const binPath = path.join(binDir, BIN_NAME);
+
+  try {
+    const stat = fs.statSync(binPath);
+    if (stat.size > 10000) return;
+  } catch {}
+
+  console.log(`Downloading ${BIN_NAME} v${version} for ${target}...`);
+
+  try {
+    const tarball = await fetch(url);
+    const verified = await verifySha256(tarball, artifact, version);
+    if (!verified) {
+      console.error("Binary rejected due to SHA-256 mismatch.");
+      process.exit(1);
+    }
+
+    const tmpTar = path.join(binDir, `${BIN_NAME}.tar.gz`);
+    fs.writeFileSync(tmpTar, tarball);
+    execSync(`tar xzf "${tmpTar}" -C "${binDir}" --strip-components=1`, {
+      stdio: "pipe",
+    });
+    fs.unlinkSync(tmpTar);
+    fs.chmodSync(binPath, 0o755);
+
+    console.log(`Installed ${BIN_NAME} v${version} to ${binPath}`);
+  } catch (err) {
+    console.error(
+      `Failed to download ${BIN_NAME} v${version} for ${target}:\n` +
+        `  ${err.message}\n\n` +
+        `You can install manually:\n` +
+        `  cargo install --path crates/agent-matters-cli`,
+    );
+  }
+}
+
+install();
