@@ -24,6 +24,7 @@ pub mod generated_help;
 pub mod help_text;
 mod profile_render;
 pub mod profiles;
+pub mod runtime_import;
 pub mod sources;
 
 /// Top level `agent-matters` CLI.
@@ -56,6 +57,28 @@ pub enum Command {
     Sources {
         #[command(subcommand)]
         command: sources::SourcesCmd,
+    },
+    /// Import an existing runtime home into catalog capabilities and a profile.
+    #[command(
+        long_about = generated_help::IMPORT_ABOUT,
+        after_help = help_text::IMPORT_AFTER_HELP
+    )]
+    Import {
+        /// Path to the existing runtime config directory.
+        #[arg(help = generated_help::IMPORT_PATH_HELP)]
+        path: PathBuf,
+        /// Profile id to create from the runtime home.
+        #[arg(long, help = generated_help::IMPORT_PROFILE_HELP)]
+        profile: Option<String>,
+        /// Runtime to use when detection is ambiguous.
+        #[arg(long, value_enum, help = generated_help::IMPORT_RUNTIME_HELP)]
+        runtime: Option<Runtime>,
+        /// Write files after reviewing the default dry run report.
+        #[arg(long, help = generated_help::IMPORT_WRITE_HELP)]
+        write: bool,
+        /// Emit machine readable JSON instead of the human report.
+        #[arg(short = 'j', long, help = generated_help::IMPORT_JSON_HELP)]
+        json: bool,
     },
     /// Diagnose catalog, runtime, and auth setup.
     #[command(
@@ -109,6 +132,13 @@ pub fn dispatch(cli: Cli) -> anyhow::Result<i32> {
         Some(Command::Profiles { command }) => profiles::dispatch(command),
         Some(Command::Capabilities { command }) => capabilities::dispatch(command),
         Some(Command::Sources { command }) => sources::dispatch(command),
+        Some(Command::Import {
+            path,
+            profile,
+            runtime,
+            write,
+            json,
+        }) => runtime_import::run(path, profile, runtime, write, json),
         Some(Command::Doctor { json }) => doctor::run(json),
         Some(Command::Completions { shell }) => {
             let mut cmd = Cli::command();

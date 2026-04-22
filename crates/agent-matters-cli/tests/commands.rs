@@ -15,5 +15,7 @@ mod doctor;
 mod help;
 #[path = "commands/profiles.rs"]
 mod profiles;
+#[path = "commands/runtime_import.rs"]
+mod runtime_import;
 #[path = "commands/sources.rs"]
 mod sources;

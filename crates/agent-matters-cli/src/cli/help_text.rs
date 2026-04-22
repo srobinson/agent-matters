@@ -77,6 +77,13 @@ pub const SOURCES_IMPORT_AFTER_HELP: &str =
   agent-matters sources import skills.sh:owner/repo@skill-name --json";
 
 #[rustfmt::skip]
+pub const IMPORT_AFTER_HELP: &str =
+"Examples:\n  \
+  agent-matters import ~/.claude\n  \
+  agent-matters import ~/.codex --write\n  \
+  agent-matters import ./runtime-home --runtime codex --profile imported-codex --json";
+
+#[rustfmt::skip]
 pub const DOCTOR_AFTER_HELP: &str =
 "Examples:\n  \
   agent-matters doctor\n  \

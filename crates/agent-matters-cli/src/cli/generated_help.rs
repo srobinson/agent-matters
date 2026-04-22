@@ -84,6 +84,19 @@ pub const SOURCES_IMPORT_JSON_HELP: &str = "Emit machine readable JSON instead o
 pub const SOURCES_IMPORT_UPDATE_HELP: &str = "Update an existing imported capability instead of reporting a conflict";
 
 #[rustfmt::skip]
+pub const IMPORT_ABOUT: &str = "Import an existing Codex or Claude runtime home.\n\nRuntime and profile default from the path when possible. Default mode is a dry run that reports the profile, capabilities, vendor records, skipped credential files, and conflicts that would be produced. Use `--write` after reviewing the report to create catalog content.";
+#[rustfmt::skip]
+pub const IMPORT_PATH_HELP: &str = "Path to the existing runtime config directory";
+#[rustfmt::skip]
+pub const IMPORT_PROFILE_HELP: &str = "Profile id to create. Defaults to `imported-<path-name>`.";
+#[rustfmt::skip]
+pub const IMPORT_RUNTIME_HELP: &str = "Runtime to use when detection from the path is ambiguous";
+#[rustfmt::skip]
+pub const IMPORT_WRITE_HELP: &str = "Write the import after reviewing the dry run report";
+#[rustfmt::skip]
+pub const IMPORT_JSON_HELP: &str = "Emit machine readable JSON instead of the human report";
+
+#[rustfmt::skip]
 pub const DOCTOR_ABOUT: &str = "Diagnose catalog, runtime, and auth setup.\n\nRuns the full suite of local integrity checks: catalog discovery, manifest schema, capability requirement resolution, required environment variables, overlay and vendor consistency, runtime adapter reachability, and credential allowlist presence. Reports findings grouped by severity.";
 #[rustfmt::skip]
 pub const DOCTOR_JSON_HELP: &str = "Emit machine readable JSON instead of the grouped human report";

@@ -274,6 +274,47 @@ type = "boolean"
 cli_flag = "update"
 cli_help = "Update an existing imported capability instead of reporting a conflict"
 
+[tools.import]
+cli_about = """
+Import an existing Codex or Claude runtime home.
+
+Runtime and profile default from the path when possible. Default mode is a \
+dry run that reports the profile, capabilities, vendor records, skipped \
+credential files, and conflicts that would be produced. Use `--write` after \
+reviewing the report to create catalog content.
+"""
+
+[[tools.import.params]]
+name = "path"
+type = "string"
+required = true
+cli_help = "Path to the existing runtime config directory"
+
+[[tools.import.params]]
+name = "profile"
+type = "string"
+cli_flag = "profile"
+cli_help = "Profile id to create. Defaults to `imported-<path-name>`."
+
+[[tools.import.params]]
+name = "runtime"
+type = "string"
+enum = ["codex", "claude"]
+cli_flag = "runtime"
+cli_help = "Runtime to use when detection from the path is ambiguous"
+
+[[tools.import.params]]
+name = "write"
+type = "boolean"
+cli_flag = "write"
+cli_help = "Write the import after reviewing the dry run report"
+
+[[tools.import.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human report"
+
 # ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------
