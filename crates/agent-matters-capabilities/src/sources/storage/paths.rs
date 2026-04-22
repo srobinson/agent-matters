@@ -4,7 +4,6 @@ use agent_matters_core::catalog::{MANIFEST_FILE_NAME, VENDOR_DIR_NAME};
 
 use super::super::contract::SourceImportFile;
 use super::SourceImportStorageError;
-use super::fs::path_exists;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ImportTreePaths {
@@ -13,17 +12,6 @@ pub(super) struct ImportTreePaths {
     pub(super) vendor_dir: PathBuf,
     pub(super) catalog_files: Vec<PathBuf>,
     pub(super) vendor_files: Vec<PathBuf>,
-}
-
-pub(super) fn reject_complete_existing_import(
-    paths: &ImportTreePaths,
-) -> Result<(), SourceImportStorageError> {
-    if path_exists(&paths.capability_dir)? && path_exists(&paths.vendor_dir)? {
-        return Err(SourceImportStorageError::AlreadyExists {
-            path: paths.capability_dir.clone(),
-        });
-    }
-    Ok(())
 }
 
 pub(super) fn import_tree_paths(
@@ -62,11 +50,19 @@ pub(super) fn validated_vendor_dir(
 }
 
 pub(super) fn temp_sibling(path: &Path, label: &str) -> PathBuf {
+    sibling_with_name(path, format_args!("{label}.tmp-{}", std::process::id()))
+}
+
+pub(super) fn durable_sibling(path: &Path, label: &str) -> PathBuf {
+    sibling_with_name(path, format_args!("{label}"))
+}
+
+fn sibling_with_name(path: &Path, suffix: std::fmt::Arguments<'_>) -> PathBuf {
     let name = path
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("source-import");
-    path.with_file_name(format!(".{name}.{label}.tmp-{}", std::process::id()))
+    path.with_file_name(format!(".{name}.{suffix}"))
 }
 
 fn validate_file_set(

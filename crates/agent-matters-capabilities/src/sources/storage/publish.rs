@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use super::SourceImportStorageError;
 use super::fs::{move_path_if_exists, path_exists, publish_path, remove_path_if_exists};
-use super::partial::{PublishedTree, complete_partial_new_import};
-use super::paths::{ImportTreePaths, temp_sibling};
+use super::partial::{PublishedTree, complete_partial_new_import, trees_match};
+use super::paths::{ImportTreePaths, durable_sibling};
+use super::{SourceImportStorageError, WriteSourceImportStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ReplacementBackupPaths {
@@ -15,7 +15,7 @@ pub(super) fn publish_staged_import(
     staging_paths: &ImportTreePaths,
     final_paths: &ImportTreePaths,
     replace_existing: bool,
-) -> Result<(), SourceImportStorageError> {
+) -> Result<WriteSourceImportStatus, SourceImportStorageError> {
     if replace_existing {
         return publish_replacing_staged_import(staging_paths, final_paths);
     }
@@ -26,17 +26,26 @@ pub(super) fn publish_staged_import(
 fn publish_new_staged_import(
     staging_paths: &ImportTreePaths,
     final_paths: &ImportTreePaths,
-) -> Result<(), SourceImportStorageError> {
+) -> Result<WriteSourceImportStatus, SourceImportStorageError> {
     match (
         path_exists(&final_paths.capability_dir)?,
         path_exists(&final_paths.vendor_dir)?,
     ) {
-        (false, false) => publish_fresh_new_import(staging_paths, final_paths),
+        (false, false) => {
+            publish_fresh_new_import(staging_paths, final_paths)?;
+            Ok(WriteSourceImportStatus::Created)
+        }
         (true, false) => {
-            complete_partial_new_import(PublishedTree::Capability, staging_paths, final_paths)
+            complete_partial_new_import(PublishedTree::Capability, staging_paths, final_paths)?;
+            Ok(WriteSourceImportStatus::Created)
         }
         (false, true) => {
-            complete_partial_new_import(PublishedTree::Vendor, staging_paths, final_paths)
+            complete_partial_new_import(PublishedTree::Vendor, staging_paths, final_paths)?;
+            Ok(WriteSourceImportStatus::Created)
+        }
+        (true, true) if complete_import_matches(staging_paths, final_paths)? => {
+            discard_staged_import(staging_paths)?;
+            Ok(WriteSourceImportStatus::Unchanged)
         }
         (true, true) => Err(SourceImportStorageError::AlreadyExists {
             path: final_paths.capability_dir.clone(),
@@ -61,13 +70,24 @@ fn publish_fresh_new_import(
 fn publish_replacing_staged_import(
     staging_paths: &ImportTreePaths,
     final_paths: &ImportTreePaths,
-) -> Result<(), SourceImportStorageError> {
+) -> Result<WriteSourceImportStatus, SourceImportStorageError> {
     let backup_paths = ReplacementBackupPaths {
-        capability_dir: temp_sibling(&final_paths.capability_dir, "source-import-backup"),
-        vendor_dir: temp_sibling(&final_paths.vendor_dir, "source-import-backup"),
+        capability_dir: durable_sibling(&final_paths.capability_dir, "source-import-backup"),
+        vendor_dir: durable_sibling(&final_paths.vendor_dir, "source-import-backup"),
     };
-    remove_path_if_exists(&backup_paths.capability_dir)?;
-    remove_path_if_exists(&backup_paths.vendor_dir)?;
+    recover_interrupted_replacement(&backup_paths, final_paths)?;
+
+    if path_exists(&final_paths.capability_dir)? && path_exists(&final_paths.vendor_dir)? {
+        if complete_import_matches(staging_paths, final_paths)? {
+            discard_staged_import(staging_paths)?;
+            return Ok(WriteSourceImportStatus::Unchanged);
+        }
+    } else {
+        remove_path_if_exists(&final_paths.capability_dir)?;
+        remove_path_if_exists(&final_paths.vendor_dir)?;
+        publish_fresh_new_import(staging_paths, final_paths)?;
+        return Ok(WriteSourceImportStatus::Created);
+    }
 
     let capability_backed_up =
         move_path_if_exists(&final_paths.capability_dir, &backup_paths.capability_dir)?;
@@ -85,10 +105,10 @@ fn publish_replacing_staged_import(
             }
         };
 
-    match publish_new_staged_import(staging_paths, final_paths) {
+    match publish_fresh_new_import(staging_paths, final_paths) {
         Ok(()) => {
             cleanup_replacement_backups(&backup_paths);
-            Ok(())
+            Ok(WriteSourceImportStatus::Updated)
         }
         Err(source) => {
             rollback_published_replacement(
@@ -100,6 +120,75 @@ fn publish_replacing_staged_import(
             Err(source)
         }
     }
+}
+
+fn complete_import_matches(
+    staging_paths: &ImportTreePaths,
+    final_paths: &ImportTreePaths,
+) -> Result<bool, SourceImportStorageError> {
+    Ok(
+        trees_match(&staging_paths.capability_dir, &final_paths.capability_dir)?
+            && trees_match(&staging_paths.vendor_dir, &final_paths.vendor_dir)?,
+    )
+}
+
+fn discard_staged_import(paths: &ImportTreePaths) -> Result<(), SourceImportStorageError> {
+    remove_path_if_exists(&paths.capability_dir)?;
+    remove_path_if_exists(&paths.vendor_dir)
+}
+
+fn recover_interrupted_replacement(
+    backup_paths: &ReplacementBackupPaths,
+    final_paths: &ImportTreePaths,
+) -> Result<(), SourceImportStorageError> {
+    let capability_backup_exists = path_exists(&backup_paths.capability_dir)?;
+    let vendor_backup_exists = path_exists(&backup_paths.vendor_dir)?;
+    if !capability_backup_exists && !vendor_backup_exists {
+        return Ok(());
+    }
+
+    let capability_final_exists = path_exists(&final_paths.capability_dir)?;
+    let vendor_final_exists = path_exists(&final_paths.vendor_dir)?;
+    if capability_final_exists && vendor_final_exists {
+        return remove_replacement_backups(backup_paths);
+    }
+
+    restore_interrupted_replacement(
+        backup_paths,
+        final_paths,
+        capability_backup_exists,
+        vendor_backup_exists,
+    )
+}
+
+fn restore_interrupted_replacement(
+    backup_paths: &ReplacementBackupPaths,
+    final_paths: &ImportTreePaths,
+    capability_backed_up: bool,
+    vendor_backed_up: bool,
+) -> Result<(), SourceImportStorageError> {
+    if !capability_backed_up && !path_exists(&final_paths.capability_dir)? {
+        return Err(SourceImportStorageError::ReplacementRecoveryConflict {
+            missing: final_paths.capability_dir.clone(),
+            backup: backup_paths.capability_dir.clone(),
+        });
+    }
+    if !vendor_backed_up && !path_exists(&final_paths.vendor_dir)? {
+        return Err(SourceImportStorageError::ReplacementRecoveryConflict {
+            missing: final_paths.vendor_dir.clone(),
+            backup: backup_paths.vendor_dir.clone(),
+        });
+    }
+
+    if capability_backed_up {
+        remove_path_if_exists(&final_paths.capability_dir)?;
+        publish_path(&backup_paths.capability_dir, &final_paths.capability_dir)?;
+    }
+    if vendor_backed_up {
+        remove_path_if_exists(&final_paths.vendor_dir)?;
+        publish_path(&backup_paths.vendor_dir, &final_paths.vendor_dir)?;
+    }
+    Ok(())
 }
 
 fn rollback_published_replacement(
@@ -135,6 +224,13 @@ fn restore_replacement_backups(
 fn cleanup_replacement_backups(paths: &ReplacementBackupPaths) {
     let _ = remove_path_if_exists(&paths.capability_dir);
     let _ = remove_path_if_exists(&paths.vendor_dir);
+}
+
+fn remove_replacement_backups(
+    paths: &ReplacementBackupPaths,
+) -> Result<(), SourceImportStorageError> {
+    remove_path_if_exists(&paths.capability_dir)?;
+    remove_path_if_exists(&paths.vendor_dir)
 }
 
 #[cfg(test)]

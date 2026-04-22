@@ -18,11 +18,12 @@ pub use contract::{
 };
 pub use import::{
     ImportSourceAdapterRequest, ImportSourceError, ImportSourceRequest, ImportSourceResult,
-    import_source, import_source_from_adapter, import_source_from_adapter_with_policy,
+    ImportSourceStatus, import_source, import_source_from_adapter,
+    import_source_from_adapter_with_policy,
 };
 pub use search::{SearchSourceRequest, search_source};
 pub use skills_sh::{CommandOutput, NpxSkillsCommand, SkillsShAdapter, SkillsShCommand};
 pub use storage::{
     SourceImportStorageError, WriteSourceImportRequest, WriteSourceImportResult,
-    write_source_import,
+    WriteSourceImportStatus, write_source_import,
 };

@@ -60,7 +60,7 @@ impl<'a> PartialImportPaths<'a> {
     }
 }
 
-fn trees_match(left: &Path, right: &Path) -> Result<bool, SourceImportStorageError> {
+pub(super) fn trees_match(left: &Path, right: &Path) -> Result<bool, SourceImportStorageError> {
     let left_metadata = inspect_metadata(left)?;
     let right_metadata = inspect_metadata(right)?;
     if left_metadata.file_type().is_symlink() || right_metadata.file_type().is_symlink() {

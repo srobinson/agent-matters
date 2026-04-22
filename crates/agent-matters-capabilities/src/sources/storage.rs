@@ -12,9 +12,7 @@ use agent_matters_core::catalog::{CATALOG_DIR_NAME, capability_kind_dir_name};
 
 use super::contract::SourceImportResult;
 pub use error::SourceImportStorageError;
-use paths::{
-    import_tree_paths, reject_complete_existing_import, temp_sibling, validated_vendor_dir,
-};
+use paths::{import_tree_paths, temp_sibling, validated_vendor_dir};
 use provenance::validate_provenance;
 use publish::publish_staged_import;
 use staging::{cleanup_staging, prepare_staging, write_staged_import};
@@ -26,8 +24,16 @@ pub struct WriteSourceImportRequest {
     pub replace_existing: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteSourceImportStatus {
+    Created,
+    Updated,
+    Unchanged,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WriteSourceImportResult {
+    pub status: WriteSourceImportStatus,
     pub capability_dir: PathBuf,
     pub manifest_path: PathBuf,
     pub vendor_dir: PathBuf,
@@ -65,10 +71,6 @@ pub fn write_source_import(
         &request.import.vendor_files,
     )?;
 
-    if !request.replace_existing {
-        reject_complete_existing_import(&final_paths)?;
-    }
-
     let manifest = toml::to_string_pretty(&request.import.manifest).map_err(|source| {
         SourceImportStorageError::SerializeManifest {
             capability: request.import.manifest.id.to_string(),
@@ -90,14 +92,17 @@ pub fn write_source_import(
         return Err(source);
     }
 
-    let publish_result =
-        publish_staged_import(&staging_paths, &final_paths, request.replace_existing);
-    if let Err(source) = publish_result {
-        cleanup_staging(&staging_paths);
-        return Err(source);
-    }
+    let status = match publish_staged_import(&staging_paths, &final_paths, request.replace_existing)
+    {
+        Ok(status) => status,
+        Err(source) => {
+            cleanup_staging(&staging_paths);
+            return Err(source);
+        }
+    };
 
     Ok(WriteSourceImportResult {
+        status,
         capability_dir: final_paths.capability_dir,
         manifest_path: final_paths.manifest_path,
         vendor_dir: final_paths.vendor_dir,

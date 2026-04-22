@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use agent_matters_capabilities::sources::{
-    ImportSourceRequest, SearchSourceRequest, import_source, search_source,
+    ImportSourceRequest, ImportSourceStatus, SearchSourceRequest, import_source, search_source,
 };
 use agent_matters_core::domain::DiagnosticReport;
 use clap::Subcommand;
@@ -43,6 +43,9 @@ pub enum SourcesCmd {
         /// Emit JSON instead of human readable output.
         #[arg(short = 'j', long, help = generated_help::SOURCES_IMPORT_JSON_HELP)]
         json: bool,
+        /// Update an existing imported capability.
+        #[arg(long, help = generated_help::SOURCES_IMPORT_UPDATE_HELP)]
+        update: bool,
     },
 }
 
@@ -54,7 +57,11 @@ pub fn dispatch(cmd: SourcesCmd) -> anyhow::Result<i32> {
             query,
             json,
         } => run_search(&source, &query, json),
-        SourcesCmd::Import { locator, json } => run_import(&locator, json),
+        SourcesCmd::Import {
+            locator,
+            json,
+            update,
+        } => run_import(&locator, json, update),
     }
 }
 
@@ -88,20 +95,24 @@ fn run_search(source: &str, query: &str, json: bool) -> anyhow::Result<i32> {
     }
 }
 
-fn run_import(locator: &str, json: bool) -> anyhow::Result<i32> {
+fn run_import(locator: &str, json: bool, update: bool) -> anyhow::Result<i32> {
     let (repo_root, user_state_dir) = default_catalog_paths()?;
     match import_source(ImportSourceRequest {
         repo_root: repo_root.clone(),
         user_state_dir,
         locator: locator.to_string(),
-        replace_existing: false,
+        replace_existing: update,
     }) {
         Ok(result) => {
             if json {
                 println!("{}", serde_json::to_string_pretty(&result)?);
             } else {
                 emit_diagnostics(&result.diagnostics);
-                println!("Imported {}", result.capability_id);
+                println!(
+                    "{} {}",
+                    import_status_label(result.status),
+                    result.capability_id
+                );
                 println!("source\t{}:{}", result.source, result.locator);
                 println!(
                     "manifest\t{}",
@@ -125,6 +136,14 @@ fn run_import(locator: &str, json: bool) -> anyhow::Result<i32> {
             }
             Ok(1)
         }
+    }
+}
+
+fn import_status_label(status: ImportSourceStatus) -> &'static str {
+    match status {
+        ImportSourceStatus::Created => "Imported",
+        ImportSourceStatus::Updated => "Updated",
+        ImportSourceStatus::Unchanged => "Already up to date",
     }
 }
 

@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::catalog::CatalogIndexStatus;
 use agent_matters_capabilities::sources::{
-    CommandOutput, ImportSourceAdapterRequest, ImportSourceError, SkillsShAdapter, SkillsShCommand,
-    SourceAdapter, SourceAdapterError, SourceImportRequest, SourceImportStorageError,
-    SourceSearchRequest, import_source_from_adapter,
+    CommandOutput, ImportSourceAdapterRequest, ImportSourceError, ImportSourceStatus,
+    SkillsShAdapter, SkillsShCommand, SourceAdapter, SourceAdapterError, SourceImportRequest,
+    SourceImportStorageError, SourceSearchRequest, import_source_from_adapter,
 };
 use agent_matters_core::domain::Provenance;
 use agent_matters_core::manifest::CapabilityManifest;
@@ -184,6 +184,7 @@ fn skills_sh_import_writes_vendor_catalog_and_refreshes_index() {
     })
     .unwrap();
 
+    assert_eq!(result.status, ImportSourceStatus::Created);
     assert_eq!(result.capability_id, "skill:playwright");
     assert_eq!(result.index_status, CatalogIndexStatus::RebuiltMissing);
     assert!(result.index_path.exists());
@@ -216,7 +217,7 @@ fn skills_sh_import_writes_vendor_catalog_and_refreshes_index() {
 }
 
 #[test]
-fn skills_sh_import_rejects_existing_capability_without_overwrite() {
+fn skills_sh_import_is_idempotent_and_rejects_changed_existing_capability_without_update() {
     let repo = TempDir::new().unwrap();
     let state = TempDir::new().unwrap();
     let adapter = SkillsShAdapter::with_command(MockSkillsCommand::import(skill_files()));
@@ -229,6 +230,22 @@ fn skills_sh_import_rejects_existing_capability_without_overwrite() {
         adapter: &adapter,
     })
     .unwrap();
+    let repeated = import_source_from_adapter(ImportSourceAdapterRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: state.path().to_path_buf(),
+        locator: "owner/repo@playwright".to_string(),
+        replace_existing: false,
+        adapter: &adapter,
+    })
+    .unwrap();
+    assert_eq!(repeated.status, ImportSourceStatus::Unchanged);
+
+    fs::write(
+        repo.path().join("catalog/skills/playwright/SKILL.md"),
+        "# Local Playwright\n",
+    )
+    .unwrap();
+
     let err = import_source_from_adapter(ImportSourceAdapterRequest {
         repo_root: repo.path().to_path_buf(),
         user_state_dir: state.path().to_path_buf(),
@@ -243,6 +260,13 @@ fn skills_sh_import_rejects_existing_capability_without_overwrite() {
         ImportSourceError::Storage(SourceImportStorageError::AlreadyExists { .. })
     ));
     assert_eq!(err.to_diagnostic().code, "source.import-conflict");
+    assert!(
+        err.to_diagnostic()
+            .recovery_hint
+            .as_deref()
+            .unwrap()
+            .contains("--update")
+    );
 }
 
 fn success_output() -> CommandOutput {

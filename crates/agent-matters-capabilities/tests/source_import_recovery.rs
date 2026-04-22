@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use agent_matters_capabilities::sources::{
     ImportSourceError, SourceImportFile, SourceImportResult, WriteSourceImportRequest,
-    write_source_import,
+    WriteSourceImportStatus, write_source_import,
 };
 use agent_matters_core::catalog::MANIFEST_FILE_NAME;
 use agent_matters_core::domain::{CapabilityId, CapabilityKind, Provenance, RuntimeId};
@@ -27,6 +27,7 @@ fn write_source_import_completes_half_published_new_import_on_retry() {
     })
     .unwrap();
 
+    assert_eq!(written.status, WriteSourceImportStatus::Created);
     assert!(
         written
             .manifest_path
@@ -41,6 +42,132 @@ fn write_source_import_completes_half_published_new_import_on_retry() {
         fs::read_to_string(repo.path().join("vendor/skills.sh/playwright/record.json")).unwrap(),
         "{\"name\":\"playwright\"}\n"
     );
+}
+
+#[test]
+fn write_source_import_is_idempotent_when_complete_import_matches() {
+    let repo = TempDir::new().unwrap();
+
+    write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import("playwright"),
+        replace_existing: false,
+    })
+    .unwrap();
+    let written = write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import("playwright"),
+        replace_existing: false,
+    })
+    .unwrap();
+
+    assert_eq!(written.status, WriteSourceImportStatus::Unchanged);
+}
+
+#[test]
+fn write_source_import_requires_update_when_complete_import_differs() {
+    let repo = TempDir::new().unwrap();
+
+    write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import("playwright"),
+        replace_existing: false,
+    })
+    .unwrap();
+    let err = write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import_with_contents(
+            "playwright",
+            "# Updated Playwright\n",
+            "{\"name\":\"playwright\",\"version\":2}\n",
+        ),
+        replace_existing: false,
+    })
+    .unwrap_err();
+    let diagnostic = ImportSourceError::Storage(err).to_diagnostic();
+
+    assert_eq!(diagnostic.code, "source.import-conflict");
+    assert!(
+        diagnostic
+            .recovery_hint
+            .as_deref()
+            .unwrap()
+            .contains("--update")
+    );
+}
+
+#[test]
+fn write_source_import_updates_existing_import_when_requested() {
+    let repo = TempDir::new().unwrap();
+
+    write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import("playwright"),
+        replace_existing: false,
+    })
+    .unwrap();
+    let written = write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import_with_contents(
+            "playwright",
+            "# Updated Playwright\n",
+            "{\"name\":\"playwright\",\"version\":2}\n",
+        ),
+        replace_existing: true,
+    })
+    .unwrap();
+
+    assert_eq!(written.status, WriteSourceImportStatus::Updated);
+    assert_eq!(
+        fs::read_to_string(repo.path().join("catalog/skills/playwright/SKILL.md")).unwrap(),
+        "# Updated Playwright\n"
+    );
+    assert_eq!(
+        fs::read_to_string(repo.path().join("vendor/skills.sh/playwright/record.json")).unwrap(),
+        "{\"name\":\"playwright\",\"version\":2}\n"
+    );
+}
+
+#[test]
+fn write_source_import_recovers_interrupted_update_before_replacing() {
+    let repo = TempDir::new().unwrap();
+
+    write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import("playwright"),
+        replace_existing: false,
+    })
+    .unwrap();
+
+    let capability_dir = repo.path().join("catalog/skills/playwright");
+    let vendor_dir = repo.path().join("vendor/skills.sh/playwright");
+    let capability_backup = durable_sibling(&capability_dir, "source-import-backup");
+    let vendor_backup = durable_sibling(&vendor_dir, "source-import-backup");
+    fs::rename(&capability_dir, &capability_backup).unwrap();
+    fs::rename(&vendor_dir, &vendor_backup).unwrap();
+
+    let written = write_source_import(WriteSourceImportRequest {
+        repo_root: repo.path().to_path_buf(),
+        import: source_import_with_contents(
+            "playwright",
+            "# Updated Playwright\n",
+            "{\"name\":\"playwright\",\"version\":2}\n",
+        ),
+        replace_existing: true,
+    })
+    .unwrap();
+
+    assert_eq!(written.status, WriteSourceImportStatus::Updated);
+    assert_eq!(
+        fs::read_to_string(capability_dir.join("SKILL.md")).unwrap(),
+        "# Updated Playwright\n"
+    );
+    assert_eq!(
+        fs::read_to_string(vendor_dir.join("record.json")).unwrap(),
+        "{\"name\":\"playwright\",\"version\":2}\n"
+    );
+    assert!(!capability_backup.exists());
+    assert!(!vendor_backup.exists());
 }
 
 #[test]
@@ -69,7 +196,7 @@ fn write_source_import_reports_repair_needed_when_partial_catalog_differs() {
             .recovery_hint
             .as_deref()
             .unwrap()
-            .contains("replace existing")
+            .contains("--update")
     );
     assert!(
         !repo
@@ -80,6 +207,14 @@ fn write_source_import_reports_repair_needed_when_partial_catalog_differs() {
 }
 
 fn source_import(locator: &str) -> SourceImportResult {
+    source_import_with_contents(locator, "# Playwright\n", "{\"name\":\"playwright\"}\n")
+}
+
+fn source_import_with_contents(
+    locator: &str,
+    skill_contents: &str,
+    vendor_contents: &str,
+) -> SourceImportResult {
     let mut files = BTreeMap::new();
     files.insert("source".to_string(), "SKILL.md".to_string());
 
@@ -107,11 +242,11 @@ fn source_import(locator: &str) -> SourceImportResult {
         },
         catalog_files: vec![SourceImportFile {
             relative_path: PathBuf::from("SKILL.md"),
-            contents: "# Playwright\n".to_string(),
+            contents: skill_contents.to_string(),
         }],
         vendor_files: vec![SourceImportFile {
             relative_path: PathBuf::from("record.json"),
-            contents: "{\"name\":\"playwright\"}\n".to_string(),
+            contents: vendor_contents.to_string(),
         }],
         diagnostics: Vec::new(),
     }
@@ -133,4 +268,12 @@ fn write_half_published_capability(repo: &Path, import: &SourceImportResult) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, &file.contents).unwrap();
     }
+}
+
+fn durable_sibling(path: &Path, label: &str) -> PathBuf {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("source-import");
+    path.with_file_name(format!(".{name}.{label}"))
 }

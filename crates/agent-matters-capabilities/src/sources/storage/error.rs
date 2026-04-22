@@ -18,12 +18,16 @@ pub enum SourceImportStorageError {
     },
     #[error("import for `{source_id}:{locator}` must include at least one raw vendor file")]
     MissingVendorRecord { source_id: String, locator: String },
-    #[error("refusing to replace existing import path `{path}`")]
+    #[error("refusing to update existing import path `{path}`")]
     AlreadyExists { path: PathBuf },
     #[error(
         "source import is partially published: `{existing}` exists but `{missing}` is missing and staged contents do not match"
     )]
     PartialPublishConflict { existing: PathBuf, missing: PathBuf },
+    #[error(
+        "interrupted source import update cannot be recovered: `{missing}` is missing and backup `{backup}` is missing"
+    )]
+    ReplacementRecoveryConflict { missing: PathBuf, backup: PathBuf },
     #[error("relative import path `{path}` must stay inside its target directory")]
     InvalidRelativePath { path: PathBuf },
     #[error("source import file path `{path}` is reserved for generated metadata")]

@@ -78,6 +78,63 @@ fn sources_import_writes_catalog_vendor_and_index() {
 }
 
 #[test]
+fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
+    let repo = TempDir::new().unwrap();
+    let state = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+    let locator = "skills.sh:owner/repo@playwright";
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", locator])
+        .assert()
+        .success()
+        .stdout(contains("Imported skill:playwright"));
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", locator])
+        .assert()
+        .success()
+        .stdout(contains("Already up to date skill:playwright"));
+
+    fs::write(
+        repo.path().join("catalog/skills/playwright/SKILL.md"),
+        "# Local Playwright\n",
+    )
+    .unwrap();
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", locator])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(contains("source.import-conflict"))
+        .stderr(contains("--update"));
+
+    bin()
+        .current_dir(repo.path())
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", locator, "--update"])
+        .assert()
+        .success()
+        .stdout(contains("Updated skill:playwright"));
+    assert_eq!(
+        fs::read_to_string(repo.path().join("catalog/skills/playwright/SKILL.md")).unwrap(),
+        "---\nname: playwright\ndescription: Mock Playwright skill.\nmetadata:\n  version: \"2.0.0\"\n---\n\n# Playwright\n"
+    );
+}
+
+#[test]
 fn sources_import_json_reports_policy_diagnostic() {
     let repo = TempDir::new().unwrap();
     let state = TempDir::new().unwrap();

@@ -16,7 +16,8 @@ use crate::config::{ConfigError, load_effective_source_trust_policy};
 
 use super::{
     SkillsShAdapter, SourceAdapter, SourceAdapterError, SourceImportRequest,
-    SourceImportStorageError, WriteSourceImportRequest, write_source_import,
+    SourceImportStorageError, WriteSourceImportRequest, WriteSourceImportStatus,
+    write_source_import,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,8 +36,27 @@ pub struct ImportSourceAdapterRequest<'a, A: SourceAdapter> {
     pub adapter: &'a A,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportSourceStatus {
+    Created,
+    Updated,
+    Unchanged,
+}
+
+impl From<WriteSourceImportStatus> for ImportSourceStatus {
+    fn from(status: WriteSourceImportStatus) -> Self {
+        match status {
+            WriteSourceImportStatus::Created => Self::Created,
+            WriteSourceImportStatus::Updated => Self::Updated,
+            WriteSourceImportStatus::Unchanged => Self::Unchanged,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ImportSourceResult {
+    pub status: ImportSourceStatus,
     pub source: String,
     pub locator: String,
     pub capability_id: String,
@@ -109,7 +129,7 @@ impl ImportSourceError {
                 format!("source import target `{}` already exists", path.display()),
             )
             .with_recovery_hint(
-                "remove the existing local capability or choose a different source locator",
+                "rerun the import with `--update` to refresh the existing capability",
             ),
             Self::Storage(SourceImportStorageError::PartialPublishConflict {
                 existing,
@@ -124,7 +144,22 @@ impl ImportSourceError {
                 ),
             )
             .with_recovery_hint(
-                "inspect the partial import, then remove it or retry with replace existing",
+                "inspect the partial import, then remove it or retry with `--update`",
+            ),
+            Self::Storage(SourceImportStorageError::ReplacementRecoveryConflict {
+                missing,
+                backup,
+            }) => Diagnostic::new(
+                DiagnosticSeverity::Error,
+                "source.import-repair-needed",
+                format!(
+                    "source import update cannot be recovered: `{}` and backup `{}` are missing",
+                    missing.display(),
+                    backup.display()
+                ),
+            )
+            .with_recovery_hint(
+                "inspect the interrupted update, then restore the missing path or remove the partial import",
             ),
             Self::Storage(source) => Diagnostic::new(
                 DiagnosticSeverity::Error,
@@ -210,6 +245,7 @@ pub fn import_source_from_adapter_with_policy<A: SourceAdapter>(
     diagnostics.extend(loaded.diagnostics);
 
     Ok(ImportSourceResult {
+        status: written.status.into(),
         source,
         locator,
         capability_id,
