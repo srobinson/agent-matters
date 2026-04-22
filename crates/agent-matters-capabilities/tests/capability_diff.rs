@@ -127,6 +127,34 @@ fn symlinked_vendor_path_escape_reports_diagnostic_before_using_outside_director
     ));
 }
 
+#[cfg(unix)]
+#[test]
+fn dangling_symlinked_vendor_path_reports_invalid_path_diagnostic() {
+    use std::os::unix::fs::symlink;
+
+    let repo = overlay_repo_with_locator(
+        &[("SKILL.md", "upstream\n")],
+        &[("SKILL.md", "local\n")],
+        "dangling/playwright",
+        false,
+    );
+    let vendor_source = repo.path().join("vendor/skills.sh");
+    fs::create_dir_all(&vendor_source).unwrap();
+    symlink(
+        repo.path().join("outside-missing"),
+        vendor_source.join("dangling"),
+    )
+    .unwrap();
+
+    let result = diff_repo(repo.path());
+
+    assert!(result.files.is_empty());
+    assert!(has_code(
+        &result.diagnostics,
+        "capability.diff-vendor-path-invalid"
+    ));
+}
+
 #[test]
 fn json_shape_is_stable_for_changed_file() {
     let repo = overlay_repo(

@@ -70,10 +70,10 @@ fn path_resolves_inside_repo_vendor(repo_root: &Path, vendor_root: &Path, path: 
         _ => {}
     }
     let Some(existing_path) = nearest_existing_path(path) else {
-        return true;
+        return false;
     };
     let Ok(canonical_existing_path) = fs::canonicalize(existing_path) else {
-        return true;
+        return false;
     };
     canonical_existing_path.starts_with(&canonical_vendor_root)
 }
@@ -173,6 +173,26 @@ mod tests {
         assert!(!path_is_in_repo_vendor(
             repo.path(),
             &vendor_source.join("escaped/missing")
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_vendor_symlinks_are_not_accepted() {
+        use std::os::unix::fs::symlink;
+
+        let repo = tempfile::TempDir::new().unwrap();
+        let vendor_source = repo.path().join("vendor/skills.sh");
+        fs::create_dir_all(&vendor_source).unwrap();
+        symlink(
+            repo.path().join("outside-missing"),
+            vendor_source.join("dangling"),
+        )
+        .unwrap();
+
+        assert!(!path_is_in_repo_vendor(
+            repo.path(),
+            &vendor_source.join("dangling/playwright")
         ));
     }
 }
