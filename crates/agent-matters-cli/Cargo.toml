@@ -8,6 +8,9 @@ repository.workspace = true
 description = "CLI for agent-matters runtime profiles"
 build = "build.rs"
 
+[package.metadata.dist]
+dist = true
+
 [lib]
 name = "agent_matters_cli"
 path = "src/lib.rs"

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Audit
+        run: |
+          cargo install cargo-audit --locked --quiet
+          cargo audit
+
+      - name: Check generated help is in sync with tools.toml
+        run: |
+          git diff --exit-code \
+            crates/agent-matters-cli/src/cli/generated_help.rs || \
+            (echo "ERROR: generated help is out of sync with tools.toml. Run 'cargo build -p agent-matters-cli' and commit the result." && exit 1)
