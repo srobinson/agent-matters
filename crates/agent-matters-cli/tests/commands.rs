@@ -5,7 +5,7 @@
 
 #[path = "commands/capabilities.rs"]
 mod capabilities;
-#[path = "commands/common.rs"]
+#[path = "support/mod.rs"]
 mod common;
 #[path = "commands/completions.rs"]
 mod completions;

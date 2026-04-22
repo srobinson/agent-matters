@@ -1,55 +1,17 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use assert_cmd::Command;
 use predicates::str::contains;
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn bin() -> Command {
-    Command::cargo_bin("agent-matters").expect("cargo bin available in tests")
-}
+#[path = "support/mod.rs"]
+mod common;
 
-fn fixture_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../agent-matters-capabilities/tests/fixtures")
-        .join(relative)
-}
-
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let source = entry.path();
-        let target = to.join(entry.file_name());
-        if source.is_dir() {
-            copy_dir(&source, &target);
-        } else {
-            fs::copy(&source, &target).unwrap();
-        }
-    }
-}
-
-fn valid_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    repo
-}
-
-fn append_requires(repo: &Path, manifest: &str, body: &str) {
-    let path = repo.join(manifest);
-    let mut updated = fs::read_to_string(&path).unwrap();
-    updated.push_str("\n[requires]\n");
-    updated.push_str(body);
-    fs::write(path, updated).unwrap();
-}
-
-fn native_home_with_codex_auth() -> TempDir {
-    let home = TempDir::new().unwrap();
-    fs::create_dir_all(home.path().join(".codex")).unwrap();
-    fs::write(home.path().join(".codex/auth.json"), br#"{"token":"test"}"#).unwrap();
-    home
-}
+use common::{
+    add_required_capability, add_required_env, bin, fixture_path, native_home_with_codex_auth,
+    valid_catalog_repo,
+};
 
 fn compile_json(repo: &Path, state: &Path, home: &Path) -> Value {
     let output = bin()
@@ -108,13 +70,13 @@ fn profiles_compile_renders_human_summary_and_writes_runtime_pointer() {
 
 #[test]
 fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
-    let repo = valid_repo();
+    let repo = valid_catalog_repo();
     let state = TempDir::new().unwrap();
     let home = native_home_with_codex_auth();
-    append_requires(
+    add_required_env(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
 
     let output = bin()
@@ -158,7 +120,7 @@ fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
 
 #[test]
 fn profiles_compile_json_reports_reused_build_on_second_run() {
-    let repo = valid_repo();
+    let repo = valid_catalog_repo();
     let state = TempDir::new().unwrap();
     let home = native_home_with_codex_auth();
 
@@ -231,13 +193,13 @@ fn profiles_compile_tolerates_non_utf8_environment_values() {
 
 #[test]
 fn profiles_compile_human_output_includes_missing_env_warning() {
-    let repo = valid_repo();
+    let repo = valid_catalog_repo();
     let state = TempDir::new().unwrap();
     let home = native_home_with_codex_auth();
-    append_requires(
+    add_required_env(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "env = [\"LINEAR_API_KEY\"]\n",
+        "LINEAR_API_KEY",
     );
 
     bin()
@@ -262,12 +224,12 @@ fn profiles_compile_human_output_includes_missing_env_warning() {
 
 #[test]
 fn profiles_compile_missing_required_capability_exits_with_error() {
-    let repo = valid_repo();
+    let repo = valid_catalog_repo();
     let state = TempDir::new().unwrap();
-    append_requires(
+    add_required_capability(
         repo.path(),
         "catalog/mcp/linear/manifest.toml",
-        "capabilities = [\"mcp:context-matters\"]\n",
+        "mcp:context-matters",
     );
 
     bin()

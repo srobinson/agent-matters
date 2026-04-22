@@ -1,23 +1,11 @@
-use std::{fs, path::Path};
+use std::fs;
 
 use predicates::str::contains;
 use tempfile::TempDir;
 
-use crate::common::{bin, fixture_path, write_corrupt_catalog_index};
-
-fn copy_dir(source: &Path, destination: &Path) {
-    fs::create_dir_all(destination).unwrap();
-    for entry in fs::read_dir(source).unwrap() {
-        let entry = entry.unwrap();
-        let source_path = entry.path();
-        let destination_path = destination.join(entry.file_name());
-        if source_path.is_dir() {
-            copy_dir(&source_path, &destination_path);
-        } else {
-            fs::copy(&source_path, &destination_path).unwrap();
-        }
-    }
-}
+use crate::common::{
+    bin, fixture_path, replace_profile_instruction, valid_catalog_repo, write_corrupt_catalog_index,
+};
 
 #[test]
 fn profiles_resolve_json_returns_session_cache_profile() {
@@ -43,16 +31,14 @@ fn profiles_resolve_json_returns_session_cache_profile() {
 
 #[test]
 fn profiles_resolve_json_reports_profile_diagnostics_and_exit_code() {
-    let repo = TempDir::new().unwrap();
+    let repo = valid_catalog_repo();
     let state = TempDir::new().unwrap();
-    copy_dir(&fixture_path("catalogs/valid"), repo.path());
-    let manifest_path = repo
-        .path()
-        .join("profiles/renamed-profile-dir/manifest.toml");
-    let updated = fs::read_to_string(&manifest_path)
-        .unwrap()
-        .replace("\"agent:github-researcher\"", "\"agent:missing\"");
-    fs::write(&manifest_path, updated).unwrap();
+    replace_profile_instruction(
+        repo.path(),
+        "profiles/renamed-profile-dir/manifest.toml",
+        "agent:github-researcher",
+        "agent:missing",
+    );
 
     let output = bin()
         .current_dir(repo.path())
