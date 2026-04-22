@@ -36,8 +36,17 @@ fn run_fixture(relative: &str) -> agent_matters_capabilities::doctor::DoctorResu
     run_doctor(DoctorRequest {
         repo_root: fixture_path(relative),
         user_state_dir: state.path().to_path_buf(),
+        native_home_dir: None,
     })
     .unwrap()
+}
+
+fn doctor_request(repo: &TempDir, state: &TempDir) -> DoctorRequest {
+    DoctorRequest {
+        repo_root: repo.path().to_path_buf(),
+        user_state_dir: state.path().to_path_buf(),
+        native_home_dir: None,
+    }
 }
 
 fn valid_repo() -> TempDir {
@@ -67,6 +76,7 @@ fn clean_catalog_with_fresh_index_passes_without_diagnostics() {
     let result = run_doctor(DoctorRequest {
         repo_root,
         user_state_dir: state.path().to_path_buf(),
+        native_home_dir: None,
     })
     .unwrap();
 
@@ -121,6 +131,7 @@ fn missing_capability_file_reference_is_error() {
     let result = run_doctor(DoctorRequest {
         repo_root: repo.path().to_path_buf(),
         user_state_dir: state.path().to_path_buf(),
+        native_home_dir: None,
     })
     .unwrap();
 
@@ -158,11 +169,7 @@ fn profile_missing_required_capability_is_error() {
     fs::write(&profile_manifest, updated).unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     let missing = result
         .diagnostics
@@ -185,11 +192,7 @@ fn missing_required_env_is_warning_without_values() {
     );
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
     let encoded = serde_json::to_string(&result).unwrap();
 
     let missing = result
@@ -232,11 +235,7 @@ fn missing_vendor_record_is_error() {
     fs::remove_dir_all(repo.path().join("vendor/skills.sh/playwright")).unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     let missing = result
         .diagnostics
@@ -267,11 +266,7 @@ fn nested_vendor_record_satisfies_imported_capability() {
     .unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     assert!(!result.diagnostics.iter().any(|diagnostic| {
         diagnostic.code == "catalog.vendor-record-missing"
@@ -298,11 +293,7 @@ fn unsafe_vendor_path_is_error_without_reading_outside_vendor_storage() {
     fs::write(&manifest, updated).unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     let invalid = result
         .diagnostics
@@ -337,11 +328,7 @@ version = "1.0.0"
     fs::write(&overlay_manifest, updated).unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     let missing = result
         .diagnostics
@@ -367,11 +354,7 @@ fn broken_profile_capability_and_instruction_references_are_reported() {
     fs::write(&profile_manifest, updated).unwrap();
     let state = TempDir::new().unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     assert_eq!(
         code_count(&result.diagnostics, "profile.capability-not-found"),
@@ -402,11 +385,7 @@ fn stale_generated_index_is_warning_only() {
         .replace("Focused research agent", "Changed research agent");
     fs::write(&profile_manifest, updated).unwrap();
 
-    let result = run_doctor(DoctorRequest {
-        repo_root: repo.path().to_path_buf(),
-        user_state_dir: state.path().to_path_buf(),
-    })
-    .unwrap();
+    let result = run_doctor(doctor_request(&repo, &state)).unwrap();
 
     assert_eq!(result.index.status, DoctorIndexStatus::Stale);
     let stale = result
@@ -427,5 +406,28 @@ fn doctor_result_has_stable_json_shape() {
     assert_eq!(encoded["catalog"]["capability_count"], 6);
     assert_eq!(encoded["catalog"]["profile_count"], 1);
     assert_eq!(encoded["index"]["status"], "missing");
+    assert!(encoded.get("runtimes").is_some());
+    assert!(encoded.get("generated_state").is_some());
     assert_eq!(encoded["diagnostics"], serde_json::json!([]));
+}
+
+#[test]
+fn runtime_adapter_registry_is_reported() {
+    let result = run_fixture("catalogs/valid");
+
+    let codex = result
+        .runtimes
+        .iter()
+        .find(|runtime| runtime.id == "codex")
+        .expect("codex runtime summary");
+    let claude = result
+        .runtimes
+        .iter()
+        .find(|runtime| runtime.id == "claude")
+        .expect("claude runtime summary");
+
+    assert!(codex.adapter_available);
+    assert!(codex.default_config_valid);
+    assert!(claude.adapter_available);
+    assert!(claude.default_config_valid);
 }

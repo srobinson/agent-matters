@@ -12,18 +12,22 @@ use crate::catalog::{
     CatalogIndexError, build_catalog_index, catalog_index_path, discover_catalog,
 };
 
+mod runtime;
 mod semantic;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DoctorRequest {
     pub repo_root: PathBuf,
     pub user_state_dir: PathBuf,
+    pub native_home_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DoctorResult {
     pub catalog: DoctorCatalogSummary,
     pub index: DoctorIndexSummary,
+    pub runtimes: Vec<DoctorRuntimeAdapterSummary>,
+    pub generated_state: DoctorGeneratedStateSummary,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -62,11 +66,26 @@ pub enum DoctorIndexStatus {
     Unchecked,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DoctorRuntimeAdapterSummary {
+    pub id: String,
+    pub adapter_available: bool,
+    pub default_config_valid: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DoctorGeneratedStateSummary {
+    pub path: PathBuf,
+    pub writable: bool,
+    pub runtime_pointer_count: usize,
+}
+
 pub fn run_doctor(request: DoctorRequest) -> Result<DoctorResult, CatalogIndexError> {
     let discovery = discover_catalog(&request.repo_root);
     let mut diagnostics = discovery.diagnostics.clone();
 
     semantic::validate_catalog_semantics(&request.repo_root, &discovery, &mut diagnostics);
+    let runtime = runtime::inspect_runtime_environment(&request, &discovery, &mut diagnostics);
 
     let current_index = match build_catalog_index(&request.repo_root, &discovery) {
         Ok(index) => Some(index),
@@ -87,6 +106,8 @@ pub fn run_doctor(request: DoctorRequest) -> Result<DoctorResult, CatalogIndexEr
             profile_count: discovery.profiles.len(),
         },
         index,
+        runtimes: runtime.runtimes,
+        generated_state: runtime.generated_state,
         diagnostics,
     })
 }

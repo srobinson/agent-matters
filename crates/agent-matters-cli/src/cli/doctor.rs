@@ -1,6 +1,7 @@
 //! `agent-matters doctor` subcommand.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use agent_matters_capabilities::doctor::{DoctorRequest, DoctorResult, run_doctor};
 use agent_matters_core::domain::{Diagnostic, DiagnosticSeverity};
@@ -13,6 +14,7 @@ pub fn run(json: bool) -> anyhow::Result<i32> {
     let result = run_doctor(DoctorRequest {
         repo_root,
         user_state_dir,
+        native_home_dir: native_home_dir(),
     })?;
 
     if json {
@@ -96,4 +98,8 @@ fn severity_heading(severity: DiagnosticSeverity) -> &'static str {
         "info" => "Info",
         _ => "Diagnostics",
     }
+}
+
+fn native_home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
 }
