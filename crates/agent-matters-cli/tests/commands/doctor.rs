@@ -93,6 +93,34 @@ fn doctor_json_fails_on_corrupt_generated_index() {
 }
 
 #[test]
+fn doctor_human_fails_on_corrupt_generated_index() {
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&state);
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(index_path.parent().unwrap()).unwrap();
+    fs::write(&index_path, "{not valid json").unwrap();
+    let index_display = index_path.display().to_string();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home)
+        .args(["doctor"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("Index: Corrupt"))
+        .stdout(contains("Errors:"))
+        .stdout(contains(index_display))
+        .stdout(contains("catalog.index-corrupt"))
+        .stdout(contains("generated catalog index"))
+        .stdout(contains("is corrupt"))
+        .stdout(contains(
+            "hint: delete the generated index or rerun a catalog command to rebuild it",
+        ));
+}
+
+#[test]
 fn doctor_json_fails_on_unreadable_generated_index() {
     let state = TempDir::new().unwrap();
     let home = native_home_with_codex_auth(&state);
@@ -110,6 +138,32 @@ fn doctor_json_fails_on_unreadable_generated_index() {
         .stdout(contains("\"status\": \"read-failed\""))
         .stdout(contains("\"severity\": \"error\""))
         .stdout(contains("\"code\": \"catalog.index-read-failed\""));
+}
+
+#[test]
+fn doctor_human_fails_on_unreadable_generated_index() {
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth(&state);
+    let index_path = catalog_index_path(state.path());
+    fs::create_dir_all(&index_path).unwrap();
+    let index_display = index_path.display().to_string();
+
+    bin()
+        .current_dir(fixture_path("catalogs/valid"))
+        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("HOME", home)
+        .args(["doctor"])
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(contains("Index: ReadFailed"))
+        .stdout(contains("Errors:"))
+        .stdout(contains(index_display))
+        .stdout(contains("catalog.index-read-failed"))
+        .stdout(contains("failed to read generated catalog index"))
+        .stdout(contains(
+            "hint: remove or fix the generated index path, then rerun doctor",
+        ));
 }
 
 #[cfg(unix)]
