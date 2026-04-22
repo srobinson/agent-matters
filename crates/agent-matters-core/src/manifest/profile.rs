@@ -89,6 +89,20 @@ mod tests {
     }
 
     #[test]
+    fn slashful_profile_id_is_rejected() {
+        let src = r#"
+            id = "team/linear-triage"
+            kind = "task"
+            summary = "Triage Linear issues."
+            capabilities = ["mcp:linear"]
+            instructions = ["instruction:helioy-core"]
+        "#;
+
+        let err = toml::from_str::<ProfileManifest>(src).unwrap_err();
+        assert!(err.to_string().contains("single path segment"));
+    }
+
+    #[test]
     fn profile_runtime_enabled_is_required() {
         let src = r#"
             id = "linear-triage"
@@ -103,6 +117,23 @@ mod tests {
 
         let err = toml::from_str::<ProfileManifest>(src).unwrap_err();
         assert!(err.to_string().contains("enabled"));
+    }
+
+    #[test]
+    fn slashful_profile_runtime_id_is_rejected() {
+        let src = r#"
+            id = "linear-triage"
+            kind = "task"
+            summary = "Triage Linear issues."
+            capabilities = ["mcp:linear"]
+            instructions = ["instruction:helioy-core"]
+
+            [runtimes."codex/custom"]
+            enabled = true
+        "#;
+
+        let err = toml::from_str::<ProfileManifest>(src).unwrap_err();
+        assert!(err.to_string().contains("single path segment"));
     }
 
     #[test]

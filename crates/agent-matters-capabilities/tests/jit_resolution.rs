@@ -89,7 +89,7 @@ fn clear_local_capability_match_creates_session_cache_profile() {
 
     let selected = result.selected.as_ref().unwrap();
     assert_eq!(selected.kind, "jit-profile");
-    assert!(selected.id.starts_with("jit/"));
+    assert!(selected.id.starts_with("jit-"));
     let cache = result.session_cache.as_ref().unwrap();
     assert!(cache.profile_manifest_path.ends_with("manifest.toml"));
     assert!(cache.profile_manifest_path.starts_with(state.path()));
@@ -222,7 +222,7 @@ fn session_cache_output_shape_is_stable() {
             .as_os_str(),
         "session-cache"
     );
-    assert!(cache_dir.ends_with(cache.profile_id.replace('/', "-")));
+    assert!(cache_dir.ends_with(&cache.profile_id));
     assert!(result.candidates.iter().all(|candidate| {
         candidate.kind == "capability" || candidate.kind == "existing-profile"
     }));

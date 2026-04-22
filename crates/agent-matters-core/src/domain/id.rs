@@ -1,12 +1,12 @@
-//! Shared simple-id validation used by [`CapabilityId`], [`ProfileId`],
-//! and [`RuntimeId`]. A simple id is one or more `/` separated segments;
-//! each segment is lowercase alphanumeric with internal hyphens.
+//! Shared id validation used by [`CapabilityId`], [`ProfileId`], and
+//! [`RuntimeId`]. Capability ids may use `/` separated locator segments, while
+//! profile and runtime ids must remain single path segments.
 //!
 //! Centralizing the rule here keeps the three id types aligned so users
 //! see consistent diagnostics regardless of which field rejected their
 //! input.
 
-/// Validation failure produced by [`validate_id_body`].
+/// Validation failure produced by id body validators.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum IdError {
     /// The id was empty or a segment was empty (e.g. `""`, `"a//b"`, `"/a"`).
@@ -18,6 +18,9 @@ pub enum IdError {
     /// A segment contained an unexpected character.
     #[error("id segment `{segment}` contains invalid character `{ch}`; allowed: [a-z0-9-]")]
     InvalidChar { segment: String, ch: char },
+    /// A filesystem path component id contained `/`.
+    #[error("id `{body}` must be a single path segment; `/` is not allowed")]
+    PathSeparator { body: String },
 }
 
 /// Validate the body portion of a simple id.
@@ -37,6 +40,16 @@ pub fn validate_id_body(body: &str) -> Result<(), IdError> {
         validate_segment(segment)?;
     }
     Ok(())
+}
+
+/// Validate an id body that will be used as one filesystem path segment.
+pub fn validate_path_segment_id_body(body: &str) -> Result<(), IdError> {
+    if body.contains('/') {
+        return Err(IdError::PathSeparator {
+            body: body.to_string(),
+        });
+    }
+    validate_id_body(body)
 }
 
 fn validate_segment(segment: &str) -> Result<(), IdError> {
@@ -78,6 +91,16 @@ mod tests {
     fn namespaced_segment_is_valid() {
         assert!(validate_id_body("helioy/mail").is_ok());
         assert!(validate_id_body("openai/gpt-4o").is_ok());
+    }
+
+    #[test]
+    fn path_segment_rejects_namespaced_body() {
+        assert_eq!(
+            validate_path_segment_id_body("helioy/mail"),
+            Err(IdError::PathSeparator {
+                body: "helioy/mail".to_string()
+            })
+        );
     }
 
     #[test]

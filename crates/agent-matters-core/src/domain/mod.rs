@@ -15,7 +15,7 @@ pub use capability::{CapabilityId, CapabilityIdError, CapabilityKind};
 pub use diagnostic::{
     Diagnostic, DiagnosticLocation, DiagnosticReport, DiagnosticSeverity, render_diagnostics_human,
 };
-pub use id::{IdError, validate_id_body};
+pub use id::{IdError, validate_id_body, validate_path_segment_id_body};
 pub use profile::{ProfileId, ProfileKind, ProfileKindError};
 pub use provenance::Provenance;
 pub use requirement::{

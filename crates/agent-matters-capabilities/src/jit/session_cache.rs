@@ -24,7 +24,7 @@ pub(super) fn write_session_cache_profile(
     reasons: &[&str],
 ) -> Result<JitSessionCache, JitProfileResolveError> {
     let fingerprint = jit_fingerprint(request, capability_ids);
-    let profile_body = format!("jit/{fingerprint}");
+    let profile_body = format!("jit-{fingerprint}");
     let profile_id = ProfileId::new(profile_body.clone()).map_err(|source| {
         JitProfileResolveError::ProfileId {
             body: profile_body.clone(),
@@ -35,7 +35,7 @@ pub(super) fn write_session_cache_profile(
         .user_state_dir
         .join(SESSION_CACHE_DIR_NAME)
         .join(JIT_DIR_NAME)
-        .join(profile_id.as_str().replace('/', "-"));
+        .join(profile_id.as_str());
     let manifest_path = cache_dir.join(MANIFEST_FILE_NAME);
     let manifest = generated_profile_manifest(
         profile_id,

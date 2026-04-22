@@ -98,4 +98,22 @@ mod tests {
         let err = toml::from_str::<CapabilityManifest>(src).unwrap_err();
         assert!(err.to_string().contains("supported"));
     }
+
+    #[test]
+    fn slashful_runtime_id_is_rejected() {
+        let src = r#"
+            id = "mcp:linear"
+            kind = "mcp"
+            summary = "Linear MCP server."
+
+            [files]
+            manifest = "server.toml"
+
+            [runtimes."codex/custom"]
+            supported = true
+        "#;
+
+        let err = toml::from_str::<CapabilityManifest>(src).unwrap_err();
+        assert!(err.to_string().contains("single path segment"));
+    }
 }

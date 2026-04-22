@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use super::id::{IdError, validate_id_body};
+use super::id::{IdError, validate_path_segment_id_body};
 
 /// Identifier for a runtime adapter, for example `codex` or `claude`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -16,7 +16,7 @@ pub struct RuntimeId(String);
 impl RuntimeId {
     pub fn new(body: impl Into<String>) -> Result<Self, IdError> {
         let body = body.into();
-        validate_id_body(&body)?;
+        validate_path_segment_id_body(&body)?;
         Ok(Self(body))
     }
 
@@ -71,6 +71,13 @@ mod tests {
     fn uppercase_is_rejected() {
         let err = RuntimeId::new("Codex").unwrap_err();
         assert!(matches!(err, IdError::InvalidChar { .. }));
+    }
+
+    #[test]
+    fn slash_is_rejected() {
+        let err = RuntimeId::new("codex/custom").unwrap_err();
+        assert!(matches!(err, IdError::PathSeparator { .. }));
+        assert!(err.to_string().contains("single path segment"));
     }
 
     #[test]

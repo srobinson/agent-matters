@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use super::id::{IdError, validate_id_body};
+use super::id::{IdError, validate_path_segment_id_body};
 
 /// MVP profile kinds. Kind is metadata in MVP and does not influence
 /// resolution; future work may attach behavior to specific kinds.
@@ -73,7 +73,7 @@ impl ProfileId {
     /// Validate and wrap the given string as a profile id.
     pub fn new(body: impl Into<String>) -> Result<Self, IdError> {
         let body = body.into();
-        validate_id_body(&body)?;
+        validate_path_segment_id_body(&body)?;
         Ok(Self(body))
     }
 
@@ -142,6 +142,13 @@ mod tests {
     fn profile_id_rejects_uppercase() {
         let err = ProfileId::new("GitHubResearcher").unwrap_err();
         assert!(matches!(err, IdError::InvalidChar { .. }));
+    }
+
+    #[test]
+    fn profile_id_rejects_slash() {
+        let err = ProfileId::new("team/researcher").unwrap_err();
+        assert!(matches!(err, IdError::PathSeparator { .. }));
+        assert!(err.to_string().contains("single path segment"));
     }
 
     #[test]

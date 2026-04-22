@@ -71,6 +71,15 @@ fn profile_missing_required_field_reports_field_name() {
 }
 
 #[test]
+fn profile_slashful_id_reports_path_segment_error() {
+    let src = read_fixture("manifests/profiles/slashful-id/manifest.toml");
+
+    let err = toml::from_str::<ProfileManifest>(&src).unwrap_err();
+
+    assert!(err.to_string().contains("single path segment"));
+}
+
+#[test]
 fn capability_missing_required_field_reports_field_name() {
     let src = read_fixture("manifests/capabilities/missing-files/manifest.toml");
 
@@ -95,6 +104,24 @@ fn capability_runtime_table_requires_supported_boolean() {
     let err = toml::from_str::<CapabilityManifest>(&src).unwrap_err();
 
     assert!(err.to_string().contains("supported"));
+}
+
+#[test]
+fn profile_slashful_runtime_id_reports_path_segment_error() {
+    let src = read_fixture("manifests/profiles/slashful-runtime/manifest.toml");
+
+    let err = toml::from_str::<ProfileManifest>(&src).unwrap_err();
+
+    assert!(err.to_string().contains("single path segment"));
+}
+
+#[test]
+fn capability_slashful_runtime_id_reports_path_segment_error() {
+    let src = read_fixture("manifests/capabilities/slashful-runtime/manifest.toml");
+
+    let err = toml::from_str::<CapabilityManifest>(&src).unwrap_err();
+
+    assert!(err.to_string().contains("single path segment"));
 }
 
 #[test]
