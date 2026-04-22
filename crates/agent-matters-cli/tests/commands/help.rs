@@ -1,3 +1,4 @@
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 
 use crate::common::bin;
@@ -12,7 +13,25 @@ fn profiles_help_lists_all_verbs() {
         .stdout(contains("show"))
         .stdout(contains("resolve"))
         .stdout(contains("compile"))
-        .stdout(contains("use"));
+        .stdout(contains("use"))
+        .stdout(contains("  help     Print this message").not());
+}
+
+#[test]
+fn generated_help_subcommand_is_disabled_everywhere() {
+    bin()
+        .arg("help")
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(contains("unrecognized subcommand"));
+
+    bin()
+        .args(["profiles", "help"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(contains("unrecognized subcommand"));
 }
 
 #[test]

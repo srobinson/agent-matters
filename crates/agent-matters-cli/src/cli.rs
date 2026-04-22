@@ -32,7 +32,8 @@ pub mod sources;
     name = "agent-matters",
     version = crate::VERSION,
     about = "Local first runtime profile system for Codex, Claude, and future CLI runtimes",
-    long_about = help_text::LONG_ABOUT
+    long_about = help_text::LONG_ABOUT,
+    disable_help_subcommand = true
 )]
 pub struct Cli {
     #[command(subcommand)]
