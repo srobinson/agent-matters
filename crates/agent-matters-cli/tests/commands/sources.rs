@@ -82,6 +82,43 @@ fn sources_import_writes_catalog_vendor_and_index() {
 }
 
 #[test]
+fn sources_import_defaults_to_managed_home_without_touching_cwd() {
+    let repo = TempDir::new().unwrap();
+    let home = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    let skills_bin = write_fake_skills_bin(&tools);
+    let managed_root = home.path().join(".agent-matters");
+
+    bin()
+        .current_dir(repo.path())
+        .env_remove("AGENT_MATTERS_DIR")
+        .env("HOME", home.path())
+        .env("AGENT_MATTERS_SKILLS_BIN", &skills_bin)
+        .args(["sources", "import", "skills.sh:owner/repo@playwright"])
+        .assert()
+        .success()
+        .stdout(contains("Imported skill:playwright"))
+        .stdout(contains(
+            "manifest\tcatalog/skills/playwright/manifest.toml",
+        ))
+        .stdout(contains("vendor\tvendor/skills.sh/owner/repo@playwright"));
+
+    assert!(
+        managed_root
+            .join("catalog/skills/playwright/manifest.toml")
+            .exists()
+    );
+    assert!(
+        managed_root
+            .join("vendor/skills.sh/owner/repo@playwright/record.json")
+            .exists()
+    );
+    assert!(managed_root.join("indexes/catalog.json").exists());
+    assert!(!repo.path().join("catalog").exists());
+    assert!(!repo.path().join("vendor").exists());
+}
+
+#[test]
 fn sources_import_is_idempotent_and_update_refreshes_existing_import() {
     let repo = TempDir::new().unwrap();
     let state = TempDir::new().unwrap();
