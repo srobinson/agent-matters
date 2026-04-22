@@ -51,6 +51,27 @@ fn native_home_with_codex_auth() -> TempDir {
     home
 }
 
+fn compile_json(repo: &Path, state: &Path, home: &Path) -> Value {
+    let output = bin()
+        .current_dir(repo)
+        .env("AGENT_MATTERS_STATE_DIR", state)
+        .env("HOME", home)
+        .args([
+            "profiles",
+            "compile",
+            "github-researcher",
+            "--runtime",
+            "codex",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    serde_json::from_slice(&output).unwrap()
+}
+
 #[test]
 fn profiles_compile_renders_human_summary_and_writes_runtime_pointer() {
     let state = TempDir::new().unwrap();
@@ -133,6 +154,50 @@ fn profiles_compile_json_includes_stable_build_shape_without_secret_values() {
     );
     assert!(!output.contains("secret-value-never-rendered"));
     assert!(!output.contains(r#"{"token":"test"}"#));
+}
+
+#[test]
+fn profiles_compile_json_reports_reused_build_on_second_run() {
+    let repo = valid_repo();
+    let state = TempDir::new().unwrap();
+    let home = native_home_with_codex_auth();
+
+    let first = compile_json(repo.path(), state.path(), home.path());
+    let second = compile_json(repo.path(), state.path(), home.path());
+    let first_build = &first["build"];
+    let second_build = &second["build"];
+
+    assert_eq!(first_build["status"], "created");
+    assert_eq!(second_build["status"], "reused");
+    assert_eq!(second_build["build_id"], first_build["build_id"]);
+    assert_eq!(second_build["fingerprint"], first_build["fingerprint"]);
+    assert_eq!(
+        second_build["runtime_pointer"],
+        first_build["runtime_pointer"]
+    );
+    assert_eq!(
+        second_build["pointer_target"],
+        first_build["pointer_target"]
+    );
+
+    let build_id = second_build["build_id"].as_str().unwrap();
+    let expected_pointer_target = Path::new("..")
+        .join("..")
+        .join("builds")
+        .join("codex")
+        .join("github-researcher")
+        .join(build_id)
+        .join("home");
+    let runtime_pointer = PathBuf::from(second_build["runtime_pointer"].as_str().unwrap());
+
+    assert_eq!(
+        PathBuf::from(second_build["pointer_target"].as_str().unwrap()),
+        expected_pointer_target
+    );
+    assert_eq!(
+        fs::read_link(runtime_pointer).unwrap(),
+        expected_pointer_target
+    );
 }
 
 #[cfg(unix)]
