@@ -1,0 +1,10 @@
+/target
+Cargo.lock.bak
+*.swp
+.DS_Store
+
+# fmm code index (regeneratable via `fmm generate`)
+.fmm.db
+.fmm.db-journal
+.fmm.db-wal
+.fmm.db-shm

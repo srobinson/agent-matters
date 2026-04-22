@@ -1,0 +1,16 @@
+id = "github-researcher"
+kind = "persona"
+summary = "Focused research agent for inspecting GitHub repositories."
+capabilities = [
+  "skill:playwright",
+  "mcp:linear",
+  "hook:session-logger",
+  "runtime-setting:codex-defaults",
+]
+instructions = [
+  "instruction:helioy-core",
+  "agent:github-researcher",
+]
+
+[runtimes.codex]
+enabled = true

@@ -1,0 +1,8 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Invalid overlay"
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]

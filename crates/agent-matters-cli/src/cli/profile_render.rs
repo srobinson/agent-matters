@@ -1,0 +1,287 @@
+//! Human rendering helpers for `agent-matters profiles`.
+
+use std::collections::BTreeMap;
+
+use agent_matters_capabilities::jit::JitProfileResolveResult;
+use agent_matters_capabilities::profiles::{
+    CompileProfileBuildResult, ProfileBuildWriteStatus, ShowProfileResult, UseProfileResult,
+};
+use agent_matters_core::catalog::{ProfileIndexRecord, RuntimeCompatibilitySummary};
+use agent_matters_core::domain::DiagnosticSeverity;
+
+pub(crate) fn render_profile_list(profiles: Vec<ProfileIndexRecord>) {
+    for profile in profiles {
+        println!(
+            "{}\t{}\t{}\t{}\t{}",
+            profile.id,
+            profile.kind,
+            render_enabled_runtime_names(&profile.runtimes),
+            profile.scope.enforcement,
+            profile.summary
+        );
+    }
+}
+
+pub(crate) fn render_profile_show(result: &ShowProfileResult) {
+    let Some(record) = &result.record else {
+        return;
+    };
+
+    println!("Profile: {}", record.id);
+    println!("kind: {}", record.kind);
+    println!("summary: {}", record.summary);
+    println!("source path: {}", record.source_path);
+
+    println!();
+    render_scope(record);
+    render_declared_runtimes(record);
+    render_runtime_configs(result);
+    render_capabilities(result);
+    render_instruction_fragments(result);
+}
+
+pub(crate) fn render_profile_resolve(result: &JitProfileResolveResult) {
+    println!("Runtime: {}", result.runtime);
+    match &result.selected {
+        Some(selected) => {
+            println!(
+                "Selection: {}\t{}\t{}",
+                selected.kind, selected.id, selected.reason
+            );
+        }
+        None => println!("Selection: none"),
+    }
+
+    if let Some(cache) = &result.session_cache {
+        println!("Session cache: {}", cache.cache_dir.display());
+        println!(
+            "Profile manifest: {}",
+            cache.profile_manifest_path.display()
+        );
+    }
+    if let Some(plan) = &result.build_plan {
+        println!("Build plan profile: {}", plan.profile);
+        println!("Build plan runtime: {}", plan.runtime);
+        println!("Build fingerprint: {}", plan.fingerprint);
+    }
+
+    println!();
+    println!("Candidates:");
+    if result.candidates.is_empty() {
+        println!("none");
+    } else {
+        for candidate in &result.candidates {
+            println!(
+                "{}\t{}\t{}\t{}",
+                candidate.kind, candidate.id, candidate.score, candidate.reason
+            );
+        }
+    }
+}
+
+pub(crate) fn render_profile_compile(result: &CompileProfileBuildResult) {
+    println!("Profile: {}", result.profile);
+    let Some(build) = &result.build else {
+        return;
+    };
+
+    println!("Runtime: {}", build.runtime);
+    println!("Fingerprint: {}", build.fingerprint);
+    println!("Build status: {}", render_build_status(build.status));
+    println!("Immutable build path: {}", build.build_dir.display());
+    println!("Stable runtime path: {}", build.runtime_pointer.display());
+
+    let warnings = result
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Warning)
+        .collect::<Vec<_>>();
+
+    println!();
+    println!("Warnings:");
+    if warnings.is_empty() {
+        println!("none");
+    } else {
+        for diagnostic in warnings {
+            println!("{}\t{}", diagnostic.code, diagnostic.message);
+        }
+    }
+}
+
+pub(crate) fn render_profile_use(result: &UseProfileResult) {
+    println!("Profile: {}", result.profile);
+    if let Some(build) = &result.build {
+        println!("Runtime: {}", build.runtime);
+        println!("Fingerprint: {}", build.fingerprint);
+        println!("Runtime home: {}", build.runtime_pointer.display());
+    }
+
+    if let Some(launch) = &result.launch {
+        println!();
+        println!("Launch environment:");
+        for (name, value) in &launch.env {
+            println!("{name}={value}");
+        }
+        println!();
+        println!("Manual launch:");
+        println!("{}", launch.command);
+    }
+
+    render_diagnostic_group("Blockers", result, DiagnosticSeverity::Error);
+    render_diagnostic_group("Warnings", result, DiagnosticSeverity::Warning);
+}
+
+fn render_diagnostic_group(label: &str, result: &UseProfileResult, severity: DiagnosticSeverity) {
+    let diagnostics = result
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == severity)
+        .collect::<Vec<_>>();
+
+    println!();
+    println!("{label}:");
+    if diagnostics.is_empty() {
+        println!("none");
+    } else {
+        for diagnostic in diagnostics {
+            println!("{}\t{}", diagnostic.code, diagnostic.message);
+        }
+    }
+}
+
+fn render_build_status(status: ProfileBuildWriteStatus) -> &'static str {
+    match status {
+        ProfileBuildWriteStatus::Created => "created",
+        ProfileBuildWriteStatus::Reused => "reused",
+    }
+}
+
+fn render_scope(record: &ProfileIndexRecord) {
+    println!("scope:");
+    println!("enforcement: {}", record.scope.enforcement);
+    render_string_list("paths", &record.scope.paths);
+    render_string_list("github repos", &record.scope.github_repos);
+}
+
+fn render_declared_runtimes(record: &ProfileIndexRecord) {
+    println!();
+    println!("declared runtimes:");
+    if record.runtimes.is_empty() {
+        println!("none");
+        return;
+    }
+
+    for (runtime, support) in &record.runtimes {
+        let state = if support.supported {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        let default = if record.default_runtime.as_deref() == Some(runtime.as_str()) {
+            " default"
+        } else {
+            ""
+        };
+        if let Some(model) = &support.model {
+            println!("{runtime}\t{state}{default}\tmodel={model}");
+        } else {
+            println!("{runtime}\t{state}{default}");
+        }
+    }
+}
+
+fn render_runtime_configs(result: &ShowProfileResult) {
+    println!();
+    println!("resolved runtime config:");
+    if result.runtime_configs.is_empty() {
+        println!("none");
+        return;
+    }
+
+    for config in &result.runtime_configs {
+        let selected = if result.selected_runtime.as_deref() == Some(config.id.as_str()) {
+            " selected"
+        } else {
+            ""
+        };
+        if let Some(model) = &config.model {
+            println!("{}\tmodel={}{}", config.id, model, selected);
+        } else {
+            println!("{}{}", config.id, selected);
+        }
+    }
+}
+
+fn render_capabilities(result: &ShowProfileResult) {
+    println!();
+    println!("resolved capabilities:");
+    if result.effective_capabilities.is_empty() {
+        println!("none");
+        return;
+    }
+
+    for capability in &result.effective_capabilities {
+        println!(
+            "{}\t{}\t{}\t{}",
+            capability.id,
+            capability.kind,
+            render_enabled_runtime_names(&capability.runtimes),
+            capability.source_path
+        );
+    }
+}
+
+fn render_instruction_fragments(result: &ShowProfileResult) {
+    println!();
+    println!("ordered instructions:");
+    if result.instruction_fragments.is_empty() {
+        println!("none");
+        return;
+    }
+
+    for fragment in &result.instruction_fragments {
+        println!(
+            "{}\t{}\t{}\t{}",
+            fragment.id,
+            fragment.kind,
+            fragment.source_path,
+            render_file_map(&fragment.files)
+        );
+    }
+}
+
+fn render_string_list(label: &str, values: &[String]) {
+    if values.is_empty() {
+        println!("{label}: none");
+    } else {
+        println!("{label}: {}", values.join(","));
+    }
+}
+
+fn render_file_map(files: &BTreeMap<String, String>) -> String {
+    if files.is_empty() {
+        return "files=none".to_string();
+    }
+
+    let rendered = files
+        .iter()
+        .map(|(name, path)| format!("{name}:{path}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("files={rendered}")
+}
+
+fn render_enabled_runtime_names(
+    runtimes: &BTreeMap<String, RuntimeCompatibilitySummary>,
+) -> String {
+    let enabled = runtimes
+        .iter()
+        .filter_map(|(runtime, support)| support.supported.then_some(runtime.as_str()))
+        .collect::<Vec<_>>();
+
+    if enabled.is_empty() {
+        "none".to_string()
+    } else {
+        enabled.join(",")
+    }
+}

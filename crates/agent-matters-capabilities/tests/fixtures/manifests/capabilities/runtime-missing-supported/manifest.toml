@@ -1,0 +1,8 @@
+id = "mcp:linear"
+kind = "mcp"
+summary = "Capability runtime table missing explicit supported."
+
+[files]
+manifest = "server.toml"
+
+[runtimes.codex]

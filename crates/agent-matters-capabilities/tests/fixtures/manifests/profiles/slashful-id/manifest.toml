@@ -1,0 +1,5 @@
+id = "team/github-researcher"
+kind = "persona"
+summary = "Review GitHub changes."
+capabilities = ["agent:github-researcher"]
+instructions = ["instruction:helioy-core"]

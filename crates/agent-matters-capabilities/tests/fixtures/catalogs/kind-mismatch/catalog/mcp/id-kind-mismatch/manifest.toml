@@ -1,0 +1,9 @@
+id = "skill:wrong-prefix"
+kind = "mcp"
+summary = "Capability with an id prefix that disagrees with kind."
+
+[files]
+manifest = "server.toml"
+
+[runtimes.codex]
+supported = true

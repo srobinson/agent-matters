@@ -1,0 +1,9 @@
+id = "skill:playwright"
+kind = "skill"
+summary = "Playwright browser automation skill."
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

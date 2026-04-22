@@ -1,0 +1,9 @@
+id = "skill:dupe"
+kind = "skill"
+summary = "Second duplicate skill."
+
+[files]
+source = "SKILL.md"
+
+[runtimes.codex]
+supported = true

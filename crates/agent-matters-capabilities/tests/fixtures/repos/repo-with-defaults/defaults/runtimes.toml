@@ -1,0 +1,9 @@
+# Repo defaults fixture. Mirrors a real authored repo's `defaults/runtimes.toml`
+# so `load_runtime_defaults(repo_root)` can be pointed at the fixture repo
+# directory directly.
+
+[runtimes.codex]
+model = "gpt-5.4"
+
+[runtimes.claude]
+model = "claude-sonnet-4.5"

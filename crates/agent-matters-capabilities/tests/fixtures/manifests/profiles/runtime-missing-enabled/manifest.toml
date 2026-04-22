@@ -1,0 +1,8 @@
+id = "runtime-missing-enabled"
+kind = "task"
+summary = "Profile runtime table missing explicit enabled."
+capabilities = ["mcp:linear"]
+instructions = ["instruction:helioy-core"]
+
+[runtimes.codex]
+model = "gpt-5.4"

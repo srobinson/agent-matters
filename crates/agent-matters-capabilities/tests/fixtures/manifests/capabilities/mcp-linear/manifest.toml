@@ -1,0 +1,22 @@
+id = "mcp:linear"
+kind = "mcp"
+summary = "Linear MCP server for issue and project management."
+
+[files]
+manifest = "server.toml"
+
+[runtimes.codex]
+supported = true
+
+[runtimes.claude]
+supported = true
+
+[requires]
+env = ["LINEAR_API_KEY"]
+capabilities = []
+
+[origin]
+type = "external"
+source = "skills.sh"
+locator = "linear"
+version = "1.4.2"

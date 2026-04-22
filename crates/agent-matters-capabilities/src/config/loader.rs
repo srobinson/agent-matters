@@ -1,0 +1,131 @@
+//! Disk loaders for repo defaults and user config.
+//!
+//! Every loader returns `Ok(Default::default())` when its backing file is
+//! absent so a brand new workspace or home directory just works. Invalid
+//! TOML produces [`ConfigError::Parse`] with the offending file path and
+//! the underlying parser diagnostic preserved verbatim.
+
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use agent_matters_core::config::{
+    MARKERS_FILE_NAME, Markers, REPO_DEFAULTS_DIR_NAME, RUNTIMES_FILE_NAME, RuntimeDefaults,
+    SOURCES_FILE_NAME, SourceTrustPolicy, USER_CONFIG_DIR_NAME, USER_CONFIG_FILE_NAME, UserConfig,
+};
+use serde::de::DeserializeOwned;
+
+/// Errors that can occur while loading a config file.
+///
+/// Missing files are not errors: loaders return defaults. These variants
+/// cover the two failure modes the issue calls out:
+/// * Unreadable file (permissions, io failure).
+/// * Invalid TOML.
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    /// The file exists but could not be read.
+    #[error("failed to read config file `{path}`: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    /// The file was read but contained invalid TOML or did not match the
+    /// expected schema.
+    #[error("failed to parse config file `{path}`: {source}")]
+    Parse {
+        path: PathBuf,
+        #[source]
+        source: toml::de::Error,
+    },
+}
+
+/// Load `<repo_root>/defaults/runtimes.toml` into [`RuntimeDefaults`].
+pub fn load_runtime_defaults(repo_root: &Path) -> Result<RuntimeDefaults, ConfigError> {
+    let path = repo_root
+        .join(REPO_DEFAULTS_DIR_NAME)
+        .join(RUNTIMES_FILE_NAME);
+    load_optional_toml(&path)
+}
+
+/// Load a runtime settings TOML file referenced by a `runtime-setting`
+/// capability. The file uses the same schema as repo runtime defaults.
+pub fn load_runtime_settings(path: &Path) -> Result<RuntimeDefaults, ConfigError> {
+    load_optional_toml(path)
+}
+
+/// Load `<repo_root>/defaults/markers.toml` into [`Markers`].
+pub fn load_markers(repo_root: &Path) -> Result<Markers, ConfigError> {
+    let path = repo_root
+        .join(REPO_DEFAULTS_DIR_NAME)
+        .join(MARKERS_FILE_NAME);
+    load_optional_toml(&path)
+}
+
+/// Load `<repo_root>/defaults/sources.toml` into [`SourceTrustPolicy`].
+///
+/// A missing file returns the built in MVP policy: `skills.sh` may import
+/// `skill` capabilities and every other source fails closed.
+pub fn load_repo_source_trust_policy(repo_root: &Path) -> Result<SourceTrustPolicy, ConfigError> {
+    let path = repo_root
+        .join(REPO_DEFAULTS_DIR_NAME)
+        .join(SOURCES_FILE_NAME);
+    load_optional_toml_with_missing(&path, SourceTrustPolicy::conservative_default)
+}
+
+/// Load `<user_home>/.agent-matters/config.toml` into [`UserConfig`].
+pub fn load_user_config(user_home: &Path) -> Result<UserConfig, ConfigError> {
+    let path = user_home
+        .join(USER_CONFIG_DIR_NAME)
+        .join(USER_CONFIG_FILE_NAME);
+    load_optional_toml(&path)
+}
+
+/// Load `<user_state_dir>/config.toml` into [`UserConfig`].
+pub fn load_user_config_from_state_dir(user_state_dir: &Path) -> Result<UserConfig, ConfigError> {
+    let path = user_state_dir.join(USER_CONFIG_FILE_NAME);
+    load_optional_toml(&path)
+}
+
+/// Load repo source trust policy, then let user config replace it when
+/// `[source_trust]` is present in `<user_state_dir>/config.toml`.
+pub fn load_effective_source_trust_policy(
+    repo_root: &Path,
+    user_state_dir: &Path,
+) -> Result<SourceTrustPolicy, ConfigError> {
+    let repo_policy = load_repo_source_trust_policy(repo_root)?;
+    let user_config = load_user_config_from_state_dir(user_state_dir)?;
+    Ok(user_config.source_trust.unwrap_or(repo_policy))
+}
+
+fn load_optional_toml<T>(path: &Path) -> Result<T, ConfigError>
+where
+    T: DeserializeOwned + Default,
+{
+    load_optional_toml_with_missing(path, T::default)
+}
+
+fn load_optional_toml_with_missing<T, F>(path: &Path, missing: F) -> Result<T, ConfigError>
+where
+    T: DeserializeOwned,
+    F: FnOnce() -> T,
+{
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(missing()),
+        Err(source) => {
+            return Err(ConfigError::Io {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+
+    toml::from_str::<T>(&raw).map_err(|source| ConfigError::Parse {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+#[cfg(test)]
+mod tests;

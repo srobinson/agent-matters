@@ -1,0 +1,9 @@
+id = "agent:github-researcher"
+kind = "agent"
+summary = "GitHub research specialist agent."
+
+[files]
+instructions = "AGENT.md"
+
+[runtimes.codex]
+supported = true

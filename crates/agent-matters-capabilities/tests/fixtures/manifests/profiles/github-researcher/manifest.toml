@@ -1,0 +1,32 @@
+id = "github-researcher"
+kind = "persona"
+summary = "Focused research agent for inspecting GitHub repositories."
+
+capabilities = [
+  "skill:github",
+  "mcp:context-matters",
+]
+
+instructions = [
+  "instruction:helioy-core",
+  "agent:github-researcher",
+]
+
+[scope]
+paths = ["~/Dev/LLM/DEV/helioy"]
+github_repos = ["srobinson/helioy"]
+enforcement = "warn"
+
+[runtimes]
+default = "codex"
+
+[runtimes.codex]
+enabled = true
+model = "gpt-5.4"
+
+[runtimes.claude]
+enabled = true
+model = "claude-sonnet-4.5"
+
+[instructions_output]
+markers = "html-comments"

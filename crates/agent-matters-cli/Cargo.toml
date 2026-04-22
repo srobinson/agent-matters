@@ -1,0 +1,39 @@
+[package]
+name = "agent-matters-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for agent-matters runtime profiles"
+build = "build.rs"
+
+[package.metadata.dist]
+dist = true
+
+[lib]
+name = "agent_matters_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-matters"
+path = "src/main.rs"
+
+[dependencies]
+agent-matters-capabilities = { workspace = true }
+agent-matters-core = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
+
+[build-dependencies]
+serde = { workspace = true }
+indexmap = { workspace = true }
+toml = { workspace = true }

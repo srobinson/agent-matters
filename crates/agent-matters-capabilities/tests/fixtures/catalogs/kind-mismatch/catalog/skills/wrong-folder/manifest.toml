@@ -1,0 +1,9 @@
+id = "mcp:wrong-folder"
+kind = "mcp"
+summary = "Capability stored below the wrong capability kind folder."
+
+[files]
+manifest = "server.toml"
+
+[runtimes.codex]
+supported = true

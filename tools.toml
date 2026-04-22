@@ -1,0 +1,295 @@
+# Single source of truth for agent-matters CLI help content.
+# crates/agent-matters-cli/build.rs reads this file and generates:
+#   crates/agent-matters-cli/src/cli/generated_help.rs
+#     CLI help string constants (pub const *_ABOUT, *_*_HELP)
+#
+# Tool order matches the order commands appear in `agent-matters --help`.
+# Each [tools.<key>] represents one leaf command. Noun containers
+# (`profiles`, `capabilities`, `sources`) are clap enums and do not live
+# here. Their short description stays as clap doc comments.
+#
+# Conventions
+#   cli_name      : kebab case identifier. Becomes CONSTANT_PREFIX after
+#                   upper-casing and replacing `-` with `_`.
+#                   Example: "profiles-list" -> PROFILES_LIST_ABOUT.
+#   cli_about     : long help text shown when the user passes --help. May
+#                   contain `\n` for paragraph breaks.
+#   params        : one entry per positional or flag. `cli_flag` is the
+#                   clap long flag for named args and is omitted for
+#                   positional args. `cli_help` becomes the flag or arg
+#                   help text in clap.
+
+# ---------------------------------------------------------------------------
+# profiles
+# ---------------------------------------------------------------------------
+
+[tools.profiles-list]
+cli_about = """
+List profiles discovered in the local catalog.
+
+Each profile line shows the profile id, kind, enabled runtimes, scope \
+enforcement, and summary. Use `profiles show` to inspect a single profile \
+in detail.
+"""
+
+[[tools.profiles-list.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit a JSON result object with profiles, index metadata, and diagnostics"
+
+[tools.profiles-show]
+cli_about = """
+Show a single profile and its resolved capability inventory.
+
+Prints the profile manifest, the ordered list of capabilities it includes, \
+the instruction fragments those capabilities contribute, and the runtime \
+settings that would apply for each registered runtime adapter.
+"""
+
+[[tools.profiles-show.params]]
+name = "profile"
+type = "string"
+required = true
+cli_help = "Profile identifier (matches the `id` field in its manifest)"
+
+[[tools.profiles-show.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human rendering"
+
+[tools.profiles-resolve]
+cli_about = """
+Resolve a task into an existing profile or local JIT profile.
+
+Uses only local catalog profiles and capabilities. When a clear capability \
+composition is found, writes a generated profile manifest under the session \
+cache so the result can feed compile without mutating authored catalog files.
+"""
+
+[[tools.profiles-resolve.params]]
+name = "task"
+type = "string"
+required = true
+cli_help = "Task text to resolve into local profile material"
+
+[[tools.profiles-resolve.params]]
+name = "path"
+type = "string"
+cli_help = "Workspace path for task context. Defaults to the current working directory."
+
+[[tools.profiles-resolve.params]]
+name = "runtime"
+type = "string"
+required = true
+enum = ["codex", "claude"]
+cli_flag = "runtime"
+cli_help = "Target runtime for candidate filtering and build planning"
+
+[[tools.profiles-resolve.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human resolver summary"
+
+[tools.profiles-compile]
+cli_about = """
+Compile a runtime home for the given profile without activating it.
+
+Writes an immutable build under the managed builds directory, fingerprinted \
+by resolved content. No existing `.codex` or `.claude` directory is touched. \
+Use `profiles use` to point a runtime at the compiled build.
+"""
+
+[[tools.profiles-compile.params]]
+name = "profile"
+type = "string"
+required = true
+cli_help = "Profile identifier to compile"
+
+[[tools.profiles-compile.params]]
+name = "runtime"
+type = "string"
+required = true
+enum = ["codex", "claude"]
+cli_flag = "runtime"
+cli_help = "Target runtime for the compiled build"
+
+[[tools.profiles-compile.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human summary"
+
+[tools.profiles-use]
+cli_about = """
+Activate the given profile for the target runtime.
+
+Compiles the profile if needed and points the runtime's managed home \
+(`CODEX_HOME` or `CLAUDE_CONFIG_DIR`) at the resulting build. Does not \
+launch the runtime binary; prints the launch command the caller should run.
+"""
+
+[[tools.profiles-use.params]]
+name = "profile"
+type = "string"
+required = true
+cli_help = "Profile identifier to activate"
+
+[[tools.profiles-use.params]]
+name = "path"
+type = "string"
+cli_help = "Directory to activate the profile in. Defaults to the current working directory."
+
+[[tools.profiles-use.params]]
+name = "runtime"
+type = "string"
+enum = ["codex", "claude"]
+cli_flag = "runtime"
+cli_help = "Target runtime for activation. Defaults through profile, user config, or single enabled runtime."
+
+[[tools.profiles-use.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON launch instructions"
+
+# ---------------------------------------------------------------------------
+# capabilities
+# ---------------------------------------------------------------------------
+
+[tools.capabilities-list]
+cli_about = """
+List capabilities discovered in the local catalog.
+
+Each row includes the capability id, kind, runtime support, provenance state, \
+and summary. Use `capabilities show` to inspect files, requirements, source \
+paths, and overlay metadata.
+"""
+
+[[tools.capabilities-list.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit a JSON result object with capabilities, index metadata, and diagnostics"
+
+[tools.capabilities-show]
+cli_about = """
+Show a single capability and its metadata.
+
+Prints the manifest details, source path, included files, runtime \
+compatibility, requirements, provenance, and overlay metadata for one exact \
+capability id.
+"""
+
+[[tools.capabilities-show.params]]
+name = "capability"
+type = "string"
+required = true
+cli_help = "Capability identifier"
+
+[[tools.capabilities-show.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human rendering"
+
+[tools.capabilities-diff]
+cli_about = """
+Diff a capability's local overlay against its vendor record.
+
+Only meaningful for capabilities imported from an external source. Reports \
+file level additions, deletions, and modifications so the caller can decide \
+whether to re-sync with upstream or promote the overlay.
+"""
+
+[[tools.capabilities-diff.params]]
+name = "capability"
+type = "string"
+required = true
+cli_help = "Capability identifier"
+
+[[tools.capabilities-diff.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human diff report"
+
+# ---------------------------------------------------------------------------
+# sources
+# ---------------------------------------------------------------------------
+
+[tools.sources-search]
+cli_about = """
+Search a registered source for entries matching a query.
+
+MVP sources: `skills.sh`. Additional sources (for example the MCP Registry) \
+arrive with their adapters under ALP-1916. Returns a ranked list of \
+locators suitable for passing to `sources import`.
+"""
+
+[[tools.sources-search.params]]
+name = "source"
+type = "string"
+required = true
+cli_help = "Source identifier (for example `skills.sh`)"
+
+[[tools.sources-search.params]]
+name = "query"
+type = "string"
+required = true
+cli_help = "Free form search query"
+
+[[tools.sources-search.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human table"
+
+[tools.sources-import]
+cli_about = """
+Import a capability from a source by locator.
+
+Writes normalized capability files into the catalog, preserves raw source \
+material under `vendor`, and records provenance so future syncs and diffs can \
+detect drift.
+"""
+
+[[tools.sources-import.params]]
+name = "locator"
+type = "string"
+required = true
+cli_help = "Source specific locator (scheme determined by the source adapter)"
+
+[[tools.sources-import.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the human summary"
+
+[[tools.sources-import.params]]
+name = "update"
+type = "boolean"
+cli_flag = "update"
+cli_help = "Update an existing imported capability instead of reporting a conflict"
+
+# ---------------------------------------------------------------------------
+# doctor
+# ---------------------------------------------------------------------------
+
+[tools.doctor]
+cli_about = """
+Diagnose catalog, runtime, and auth setup.
+
+Runs the full suite of local integrity checks: catalog discovery, manifest \
+schema, capability requirement resolution, required environment variables, \
+overlay and vendor consistency, runtime adapter reachability, and credential \
+allowlist presence. Reports findings grouped by severity.
+"""
+
+[[tools.doctor.params]]
+name = "json"
+type = "boolean"
+cli_flag = "json"
+cli_help = "Emit machine readable JSON instead of the grouped human report"

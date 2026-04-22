@@ -1,0 +1,6 @@
+id = "mcp:linear"
+kind = "mcp"
+summary = "Capability without required files table."
+
+[runtimes.codex]
+supported = true

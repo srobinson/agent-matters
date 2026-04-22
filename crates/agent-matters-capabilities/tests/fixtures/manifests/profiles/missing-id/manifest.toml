@@ -1,0 +1,4 @@
+kind = "persona"
+summary = "Profile without an id."
+capabilities = ["mcp:linear"]
+instructions = ["instruction:helioy-core"]

@@ -1,0 +1,4 @@
+command = "linear-mcp"
+
+[env]
+LINEAR_API_KEY = "required"
