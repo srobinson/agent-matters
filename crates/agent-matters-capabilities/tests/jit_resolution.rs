@@ -210,17 +210,14 @@ fn session_cache_output_shape_is_stable() {
     let result = resolve(repo.path(), state.path(), "linear");
     let cache = result.session_cache.as_ref().unwrap();
     let cache_dir = cache.profile_manifest_path.parent().unwrap();
+    let expected_cache_dir = Path::new("session-cache")
+        .join("jit")
+        .join(&cache.profile_id);
 
     assert_eq!(cache.cache_dir, cache_dir);
     assert_eq!(
-        cache_dir
-            .strip_prefix(state.path())
-            .unwrap()
-            .components()
-            .next()
-            .unwrap()
-            .as_os_str(),
-        "session-cache"
+        cache_dir.strip_prefix(state.path()).unwrap(),
+        expected_cache_dir
     );
     assert!(cache_dir.ends_with(&cache.profile_id));
     assert!(result.candidates.iter().all(|candidate| {
