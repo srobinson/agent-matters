@@ -82,6 +82,25 @@ fn missing_vendor_source_reports_diagnostic() {
 }
 
 #[test]
+fn unsafe_vendor_path_reports_diagnostic_before_using_outside_directory() {
+    let repo = overlay_repo_with_locator(
+        &[("SKILL.md", "upstream\n")],
+        &[("SKILL.md", "local\n")],
+        "../../outside",
+        false,
+    );
+    fs::create_dir_all(repo.path().join("outside")).unwrap();
+
+    let result = diff_repo(repo.path());
+
+    assert!(result.files.is_empty());
+    assert!(has_code(
+        &result.diagnostics,
+        "capability.diff-vendor-path-invalid"
+    ));
+}
+
+#[test]
 fn json_shape_is_stable_for_changed_file() {
     let repo = overlay_repo(
         &[("SKILL.md", "upstream\n")],
@@ -145,13 +164,23 @@ fn overlay_repo(
     overlay_files: &[(&str, &str)],
     include_vendor: bool,
 ) -> TempDir {
+    overlay_repo_with_locator(base_files, overlay_files, "playwright", include_vendor)
+}
+
+fn overlay_repo_with_locator(
+    base_files: &[(&str, &str)],
+    overlay_files: &[(&str, &str)],
+    locator: &str,
+    include_vendor: bool,
+) -> TempDir {
     let repo = TempDir::new().unwrap();
     let base = repo.path().join("catalog/skills/playwright");
     let overlay = repo.path().join("overlays/skills/playwright");
+    let manifest = capability_manifest(locator);
     fs::create_dir_all(&base).unwrap();
     fs::create_dir_all(&overlay).unwrap();
-    fs::write(base.join("manifest.toml"), capability_manifest()).unwrap();
-    fs::write(overlay.join("manifest.toml"), capability_manifest()).unwrap();
+    fs::write(base.join("manifest.toml"), &manifest).unwrap();
+    fs::write(overlay.join("manifest.toml"), &manifest).unwrap();
 
     for (path, content) in base_files {
         write_file(&base.join(path), content);
@@ -176,15 +205,16 @@ fn write_file(path: &Path, content: &str) {
     fs::write(path, content).unwrap();
 }
 
-fn capability_manifest() -> &'static str {
-    r#"id = "skill:playwright"
+fn capability_manifest(locator: &str) -> String {
+    format!(
+        r#"id = "skill:playwright"
 kind = "skill"
 summary = "Playwright skill."
 
 [origin]
 type = "external"
 source = "skills.sh"
-locator = "playwright"
+locator = "{locator}"
 version = "1.0.0"
 
 [files]
@@ -193,4 +223,5 @@ source = "SKILL.md"
 [runtimes.codex]
 supported = true
 "#
+    )
 }

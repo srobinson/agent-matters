@@ -1,5 +1,7 @@
 //! Catalog path constants shared by loaders, doctor, and compiler code.
 
+use std::path::{Component, Path};
+
 use crate::config::REPO_DEFAULTS_DIR_NAME;
 use crate::domain::CapabilityKind;
 
@@ -37,6 +39,16 @@ pub const fn known_capability_dir_names() -> &'static [&'static str] {
         CAPABILITY_AGENTS_DIR_NAME,
         CAPABILITY_RUNTIME_SETTINGS_DIR_NAME,
     ]
+}
+
+pub fn path_is_in_repo_vendor(repo_root: &Path, path: &Path) -> bool {
+    let vendor_root = repo_root.join(VENDOR_DIR_NAME);
+    let Ok(relative) = path.strip_prefix(&vendor_root) else {
+        return false;
+    };
+    let mut components = relative.components().peekable();
+    components.peek().is_some()
+        && components.all(|component| matches!(component, Component::Normal(_)))
 }
 
 #[cfg(test)]
@@ -77,5 +89,27 @@ mod tests {
             known_capability_dir_names().len(),
             CapabilityKind::all().len()
         );
+    }
+
+    #[test]
+    fn vendor_paths_must_stay_structurally_inside_vendor_storage() {
+        let repo_root = Path::new("/repo");
+
+        assert!(path_is_in_repo_vendor(
+            repo_root,
+            Path::new("/repo/vendor/skills.sh/playwright")
+        ));
+        assert!(!path_is_in_repo_vendor(
+            repo_root,
+            Path::new("/repo/vendor")
+        ));
+        assert!(!path_is_in_repo_vendor(
+            repo_root,
+            Path::new("/repo/vendor/skills.sh/../../outside")
+        ));
+        assert!(!path_is_in_repo_vendor(
+            repo_root,
+            Path::new("/repo/outside")
+        ));
     }
 }

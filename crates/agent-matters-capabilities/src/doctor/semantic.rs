@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
-use std::path::{Component, Path};
+use std::path::Path;
 
-use agent_matters_core::catalog::VENDOR_DIR_NAME;
+use agent_matters_core::catalog::path_is_in_repo_vendor;
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 
 use crate::catalog::{
@@ -178,22 +178,12 @@ fn validate_import_sources(
             }
             continue;
         };
-        if !vendor_path_is_in_repo_vendor(repo_root, vendor_path) {
+        if !path_is_in_repo_vendor(repo_root, vendor_path) {
             diagnostics.push(invalid_vendor_record_path(entry, vendor_path));
             continue;
         }
         validate_vendor_record(entry, vendor_path, diagnostics);
     }
-}
-
-fn vendor_path_is_in_repo_vendor(repo_root: &Path, vendor_path: &Path) -> bool {
-    let vendor_root = repo_root.join(VENDOR_DIR_NAME);
-    let Ok(relative) = vendor_path.strip_prefix(vendor_root) else {
-        return false;
-    };
-    let mut components = relative.components().peekable();
-    components.peek().is_some()
-        && components.all(|component| matches!(component, Component::Normal(_)))
 }
 
 fn source_requires_import_provenance(entry: &DiscoveredCapabilityManifest) -> bool {

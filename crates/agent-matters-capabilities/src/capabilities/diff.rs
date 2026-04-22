@@ -3,6 +3,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use agent_matters_core::catalog::path_is_in_repo_vendor;
 use agent_matters_core::domain::{Diagnostic, DiagnosticLocation, DiagnosticSeverity};
 use serde::Serialize;
 
@@ -140,6 +141,12 @@ pub fn diff_capability(
     let overlay = request.repo_root.join(overlay_path);
     let vendor = request.repo_root.join(vendor_path);
 
+    if !path_is_in_repo_vendor(&request.repo_root, &vendor) {
+        result
+            .diagnostics
+            .push(invalid_vendor_path(&request.capability, &vendor));
+        return Ok(result);
+    }
     if !vendor.exists() {
         result.diagnostics.push(missing_vendor_source(
             &request.capability,
@@ -214,6 +221,20 @@ fn no_overlay(capability: &str, path: &str) -> Diagnostic {
     )
     .with_location(DiagnosticLocation::manifest_path(path))
     .with_recovery_hint("create a full copy overlay under overlays/<kind>/<name>")
+}
+
+fn invalid_vendor_path(capability: &str, path: &Path) -> Diagnostic {
+    Diagnostic::new(
+        DiagnosticSeverity::Error,
+        "capability.diff-vendor-path-invalid",
+        format!(
+            "capability `{capability}` cannot be diffed because vendor source path resolves outside repository vendor storage"
+        ),
+    )
+    .with_location(DiagnosticLocation::manifest_path(path))
+    .with_recovery_hint(
+        "refresh the generated index or use relative origin source and locator values inside the vendor directory",
+    )
 }
 
 fn missing_vendor_source(capability: &str, detail: &str, path: Option<&Path>) -> Diagnostic {
