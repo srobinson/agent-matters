@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/srobinson/agent-matters/compare/v0.1.3...v0.1.4) (2026-04-23)
+
+
+### Features
+
+* added AGENT_MATTERS_DIR resolution for managed agent matters state ([74f54e5](https://github.com/srobinson/agent-matters/commit/74f54e5cbf70f666f8d06151d75418ecbeeb9b72))
+
 ## [0.1.3](https://github.com/srobinson/agent-matters/compare/v0.1.2...v0.1.3) (2026-04-22)
 
 
