@@ -25,7 +25,7 @@ fn profiles_use_renders_manual_launch_for_explicit_path() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .args([
             "profiles",
@@ -65,7 +65,7 @@ fn profiles_use_defaults_path_to_cwd() {
 
     let output = bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .args(["profiles", "use", "github-researcher", "--runtime", "codex"])
         .assert()
@@ -91,7 +91,7 @@ fn profiles_use_missing_env_exits_nonzero() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env_remove("LINEAR_API_KEY")
         .args(["profiles", "use", "github-researcher", "--runtime", "codex"])
         .assert()
@@ -121,7 +121,7 @@ fn profiles_use_ambiguous_runtime_exits_nonzero_without_flag() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "use", "github-researcher"])
         .assert()
         .failure()
@@ -146,7 +146,7 @@ fn profiles_use_scope_fail_blocks_out_of_scope_path() {
 
     bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args([
             "profiles",
             "use",
@@ -170,7 +170,7 @@ fn profiles_use_json_includes_launch_env_and_args() {
 
     let output = bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .env("HOME", home.path())
         .args([
             "profiles",

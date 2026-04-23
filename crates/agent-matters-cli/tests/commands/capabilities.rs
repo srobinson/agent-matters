@@ -9,7 +9,7 @@ fn capabilities_list_reads_generated_index_as_json() {
 
     let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "list", "--json"])
         .assert()
         .success()
@@ -42,7 +42,7 @@ fn capabilities_list_json_recovers_corrupt_generated_index() {
 
     let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "list", "--json"])
         .assert()
         .success()
@@ -76,7 +76,7 @@ fn capabilities_list_human_includes_provenance_and_summary() {
 
     bin()
         .current_dir(fixture_path("catalogs/imported-overlaid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "list"])
         .assert()
         .success()
@@ -91,7 +91,7 @@ fn capabilities_show_renders_overlay_details() {
 
     bin()
         .current_dir(fixture_path("catalogs/imported-overlaid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "show", "skill:playwright"])
         .assert()
         .success()
@@ -107,7 +107,7 @@ fn capabilities_show_json_includes_record_details() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "show", "skill:playwright", "--json"])
         .assert()
         .success()
@@ -122,7 +122,7 @@ fn capabilities_show_missing_id_exits_with_actionable_error() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "show", "skill:missing"])
         .assert()
         .failure()
@@ -137,7 +137,7 @@ fn capabilities_diff_reports_overlay_changes() {
 
     bin()
         .current_dir(fixture_path("catalogs/imported-overlaid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["capabilities", "diff", "skill:playwright"])
         .assert()
         .success()

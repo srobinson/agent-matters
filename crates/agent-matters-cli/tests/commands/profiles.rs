@@ -13,7 +13,7 @@ fn profiles_resolve_json_returns_session_cache_profile() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args([
             "profiles",
             "resolve",
@@ -42,7 +42,7 @@ fn profiles_resolve_json_reports_profile_diagnostics_and_exit_code() {
 
     let output = bin()
         .current_dir(repo.path())
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args([
             "profiles",
             "resolve",
@@ -71,7 +71,7 @@ fn profiles_list_reads_generated_index() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list"])
         .assert()
         .success()
@@ -86,7 +86,7 @@ fn profiles_list_json_includes_index_metadata() {
 
     let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list", "--json"])
         .assert()
         .success()
@@ -119,7 +119,7 @@ fn profiles_list_json_recovers_corrupt_generated_index() {
 
     let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list", "--json"])
         .assert()
         .success()
@@ -152,14 +152,14 @@ fn profiles_list_reuses_generated_index_as_json() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list", "--json"])
         .assert()
         .success();
 
     let output = bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list", "--json"])
         .assert()
         .success()
@@ -177,7 +177,7 @@ fn profiles_list_human_includes_scope_and_summary() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "list"])
         .assert()
         .success()
@@ -192,7 +192,7 @@ fn profiles_show_renders_resolution_details() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "show", "github-researcher"])
         .assert()
         .success()
@@ -215,7 +215,7 @@ fn profiles_show_json_includes_resolution_details() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "show", "github-researcher", "--json"])
         .assert()
         .success()
@@ -231,7 +231,7 @@ fn profiles_show_missing_id_exits_with_actionable_error() {
 
     bin()
         .current_dir(fixture_path("catalogs/valid"))
-        .env("AGENT_MATTERS_STATE_DIR", state.path())
+        .env("AGENT_MATTERS_DIR", state.path())
         .args(["profiles", "show", "missing-profile"])
         .assert()
         .failure()

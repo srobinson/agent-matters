@@ -84,11 +84,14 @@ optional runtime settings, and optional instruction output settings.
 
 Each capability has a `manifest.toml` with an identifier, kind, summary, file
 inventory, runtime support, optional requirements, and optional origin metadata.
-Imported source material is preserved under `catalog/vendor`; local changes can
-be represented as overlays and compared against the vendor record.
+Imported source material is normalized under `catalog/` and its raw source
+record is preserved under the resolved catalog root's `vendor/` tree. Local
+changes can be represented as overlays and compared against the vendor record.
 
-Repo defaults live under `defaults`. User state defaults to `~/.agent-matters`
-and can be redirected with `AGENT_MATTERS_STATE_DIR`.
+Repo defaults live under `defaults`. The managed agent-matters directory
+defaults to `~/.agent-matters` and can be redirected with `AGENT_MATTERS_DIR`.
+Source imports write normalized catalog material and raw vendor records under
+that managed root. Generated indexes and runtime builds live there too.
 
 ## Release And Distribution
 

@@ -18,6 +18,8 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use std::path::PathBuf;
 
+const MANAGED_ROOT_ENV: &str = "AGENT_MATTERS_DIR";
+
 pub mod capabilities;
 pub mod doctor;
 pub mod generated_help;
@@ -121,7 +123,23 @@ pub fn dispatch(cli: Cli) -> anyhow::Result<i32> {
 
 pub(crate) fn default_catalog_paths() -> anyhow::Result<(PathBuf, PathBuf)> {
     let repo_root = std::env::current_dir()?;
-    let user_state_dir = match std::env::var_os("AGENT_MATTERS_STATE_DIR") {
+    let user_state_dir = default_managed_root()?;
+
+    Ok((repo_root, user_state_dir))
+}
+
+pub(crate) fn default_source_import_paths() -> anyhow::Result<(PathBuf, PathBuf)> {
+    let user_state_dir = default_managed_root()?;
+    let repo_root = user_state_dir.clone();
+
+    Ok((repo_root, user_state_dir))
+}
+
+fn default_managed_root() -> anyhow::Result<PathBuf> {
+    Ok(match std::env::var_os(MANAGED_ROOT_ENV) {
+        Some(path) if path.is_empty() => {
+            return Err(anyhow::anyhow!("{MANAGED_ROOT_ENV} is empty"));
+        }
         Some(path) => PathBuf::from(path),
         None => {
             let home = std::env::var_os("HOME")
@@ -129,9 +147,7 @@ pub(crate) fn default_catalog_paths() -> anyhow::Result<(PathBuf, PathBuf)> {
                 .ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
             home.join(".agent-matters")
         }
-    };
-
-    Ok((repo_root, user_state_dir))
+    })
 }
 
 pub(crate) fn render_runtime_names(
